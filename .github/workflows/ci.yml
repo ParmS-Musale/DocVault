@@ -11,50 +11,16 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            # ----------------------
-            # Checkout Repository
-            # ----------------------
             - name: Checkout code
               uses: actions/checkout@v4
 
             # ----------------------
-            # Setup .NET 8
-            # ----------------------
-            - name: Setup .NET
-              uses: actions/setup-dotnet@v4
-              with:
-                  dotnet-version: "8.0.x"
-
-            - name: Restore dependencies
-              run: dotnet restore
-
-            - name: Build API
-              run: dotnet build --no-restore --configuration Release
-
-            - name: Run Tests
-              run: dotnet test --no-build --verbosity normal
-              continue-on-error: true
-
-            # ----------------------
-            # Setup Node.js
+            # Node / Angular (future safe)
             # ----------------------
             - name: Setup Node
               uses: actions/setup-node@v4
               with:
                   node-version: "18"
-                  cache: "npm"
-                  cache-dependency-path: ClientApp/package-lock.json
 
-            # ----------------------
-            # Install Angular deps
-            # ----------------------
-            - name: Install Angular dependencies
-              working-directory: ClientApp
-              run: npm install
-
-            # ----------------------
-            # Build Angular App
-            # ----------------------
-            - name: Build Angular App
-              working-directory: ClientApp
-              run: npm run build -- --configuration production
+            - name: Placeholder Step
+              run: echo "Projects not added yet. CI configured successfully."

@@ -71,6 +71,3 @@ logs/
 # Docker
 ########################################
 docker-compose.override.
-
-# Local development secrets
-DocVault.Api/appsettings.Development.json

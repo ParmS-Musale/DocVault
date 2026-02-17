@@ -1,5 +1,87 @@
-<h2>Upload Document 📤</h2>
+<main class="upload-container">
 
-<button mat-raised-button color="primary">
-  Select File
-</button>
+  <div class="upload-backdrop">
+    <span class="backdrop-blob backdrop-blob--primary"></span>
+    <span class="backdrop-blob backdrop-blob--secondary"></span>
+  </div>
+
+  <mat-card class="upload-card" appearance="outlined">
+
+    <div class="card-top-bar"></div>
+
+    <mat-card-header class="card-header">
+
+      <div class="brand-lockup" mat-card-avatar>
+        <mat-icon class="brand-icon">upload_file</mat-icon>
+      </div>
+
+      <div class="header-text">
+        <mat-card-title class="card-title">
+          Upload to <span class="brand-name">DocVault</span>
+        </mat-card-title>
+        <mat-card-subtitle class="card-subtitle">
+          Securely store your documents
+        </mat-card-subtitle>
+      </div>
+
+    </mat-card-header>
+
+    <mat-divider></mat-divider>
+
+    <mat-card-content class="card-content">
+
+      <p class="card-description">
+        Select a file to upload into your secure vault.
+        Supported formats include PDF, DOCX, images, and more.
+      </p>
+
+      <div class="upload-box">
+
+        <mat-icon class="upload-icon">cloud_upload</mat-icon>
+
+        <p class="upload-text">
+          Drag & drop your file here  
+          <br />
+          <span>or</span>
+        </p>
+
+        <input type="file" (change)="onFileSelected($event)" />
+
+        <button
+          mat-raised-button
+          color="primary"
+          class="upload-btn"
+          (click)="uploadFile()"
+          [disabled]="isUploading"
+        >
+          <mat-icon>file_upload</mat-icon>
+          {{ isUploading ? 'Uploading...' : 'Upload File' }}
+        </button>
+
+      </div>
+
+      <div class="response" *ngIf="uploadResponse">
+        <strong>Server Response:</strong>
+        <pre>{{ uploadResponse | json }}</pre>
+      </div>
+
+    </mat-card-content>
+
+    <mat-divider></mat-divider>
+
+    <mat-card-actions class="card-actions" align="end">
+
+      <button
+        mat-stroked-button
+        color="primary"
+        routerLink="/"
+      >
+        <mat-icon>arrow_back</mat-icon>
+        Back to Home
+      </button>
+
+    </mat-card-actions>
+
+  </mat-card>
+
+</main>

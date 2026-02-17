@@ -1,0 +1,82 @@
+<main class="home-container">
+
+  <div class="home-backdrop">
+    <span class="backdrop-blob backdrop-blob--primary"></span>
+    <span class="backdrop-blob backdrop-blob--secondary"></span>
+  </div>
+
+  <mat-card class="welcome-card" appearance="outlined">
+
+    <div class="card-top-bar"></div>
+
+    <mat-card-header class="card-header">
+
+      <div class="brand-lockup" mat-card-avatar>
+        <mat-icon class="brand-icon">shield_lock</mat-icon>
+      </div>
+
+      <div class="header-text">
+        <mat-card-title class="card-title">
+          Welcome to <span class="brand-name">DocVault</span>
+        </mat-card-title>
+        <mat-card-subtitle class="card-subtitle">
+          Your secure document dashboard
+        </mat-card-subtitle>
+      </div>
+
+    </mat-card-header>
+
+    <mat-divider></mat-divider>
+
+    <mat-card-content class="card-content">
+
+      <p class="card-description">
+        Store, organise, and retrieve your important files with confidence.
+        DocVault keeps everything encrypted, indexed, and accessible whenever you need it.
+      </p>
+
+      <div class="feature-list">
+
+        <div class="feature-item">
+          <mat-icon class="feature-icon">folder_open</mat-icon>
+          <span class="feature-label">Organised storage</span>
+        </div>
+
+        <div class="feature-item">
+          <mat-icon class="feature-icon">lock</mat-icon>
+          <span class="feature-label">End-to-end encrypted</span>
+        </div>
+
+        <div class="feature-item">
+          <mat-icon class="feature-icon">cloud_done</mat-icon>
+          <span class="feature-label">Access anywhere</span>
+        </div>
+
+      </div>
+
+    </mat-card-content>
+
+    <mat-divider></mat-divider>
+
+    <mat-card-actions class="card-actions" align="end">
+
+      <span class="actions-hint">
+        <mat-icon class="hint-icon">info_outline</mat-icon>
+        Drag &amp; drop supported
+      </span>
+
+      <button
+        mat-raised-button
+        color="primary"
+        class="upload-btn"
+        routerLink="/upload"
+      >
+        <mat-icon>upload_file</mat-icon>
+        Go to Upload
+      </button>
+
+    </mat-card-actions>
+
+  </mat-card>
+
+</main>

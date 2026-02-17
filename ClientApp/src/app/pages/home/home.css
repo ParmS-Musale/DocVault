@@ -1,0 +1,170 @@
+/* Page Layout */
+.home-container {
+  min-height: calc(100vh - 64px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  padding: 2rem;
+  background: linear-gradient(135deg, #f8fafc, #eef2f7);
+  overflow: hidden;
+}
+
+/* Soft Background Blobs */
+.home-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.backdrop-blob {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.35;
+}
+
+.backdrop-blob--primary {
+  background: #3f51b5;
+  top: -60px;
+  left: -60px;
+}
+
+.backdrop-blob--secondary {
+  background: #ff4081;
+  bottom: -80px;
+  right: -80px;
+}
+
+/* Card */
+.welcome-card {
+  width: 100%;
+  max-width: 520px;
+  border-radius: 18px;
+  z-index: 1;
+  background: white;
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.08),
+    0 4px 10px rgba(0, 0, 0, 0.04);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.welcome-card:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.12),
+    0 6px 14px rgba(0, 0, 0, 0.06);
+}
+
+/* Accent Bar */
+.card-top-bar {
+  height: 6px;
+  border-radius: 18px 18px 0 0;
+  background: linear-gradient(90deg, #3f51b5, #7c4dff);
+}
+
+/* Header */
+.card-header {
+  padding-bottom: 0.5rem;
+}
+
+.brand-lockup {
+  background: linear-gradient(135deg, #3f51b5, #7c4dff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-icon {
+  color: white;
+  font-size: 26px;
+}
+
+.card-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.brand-name {
+  color: #3f51b5;
+}
+
+.card-subtitle {
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
+/* Content */
+.card-content {
+  padding-top: 1rem;
+}
+
+.card-description {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #444;
+  margin-bottom: 1.2rem;
+}
+
+/* Features */
+.feature-list {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #555;
+  background: #f5f7fb;
+  padding: 0.4rem 0.6rem;
+  border-radius: 10px;
+}
+
+.feature-icon {
+  font-size: 18px;
+  color: #3f51b5;
+}
+
+/* Actions */
+.card-actions {
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.actions-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: #777;
+}
+
+.hint-icon {
+  font-size: 16px;
+  opacity: 0.6;
+}
+
+/* Upload Button */
+.upload-btn {
+  border-radius: 10px;
+  padding-inline: 1rem;
+  font-weight: 500;
+  text-transform: none;
+  box-shadow: 0 4px 12px rgba(63, 81, 181, 0.3);
+}
+
+.upload-btn mat-icon {
+  margin-right: 6px;
+}

@@ -250,14 +250,42 @@ The script provisions:
 
 ## API Reference
 
+<<<<<<< HEAD
+=======
+### `GET /api/documents/health`
+Returns API liveness status.
+
+**Response 200:**
+```json
+{ "status": "Healthy", "timestamp": "2025-01-01T00:00:00Z", "version": "1.0.0" }
+```
+
+---
+
+>>>>>>> d584b078e401b91979c050deb31427089cc4a1c1
 ### `GET /api/documents`
 Returns all documents for the current user, each with a fresh SAS download URL.
 
 **Response 200:**
 ```json
 [
+<<<<<<< HEAD
   Details of all documents.
 ]
+=======
+  {
+    "id": "abc123",
+    "fileName": "report.pdf",
+    "fileSize": 204800,
+    "contentType": "application/pdf",
+    "uploadDate": "2025-01-01T10:30:00Z",
+    "downloadUrl": "https://storage.blob.core.windows.net/...?sig=..."
+  }
+]
+```
+
+---
+>>>>>>> d584b078e401b91979c050deb31427089cc4a1c1
 
 ### `POST /api/documents`
 Uploads a document via `multipart/form-data`.

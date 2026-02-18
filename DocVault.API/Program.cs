@@ -4,6 +4,18 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();          // Enables Controllers
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+<<<<<<< feat/ui-upload-polish
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("ClientOrigin", policy =>
+    {
+        policy.WithOrigins("http://localhost:4200", "http://localhost:55813")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+=======
+>>>>>>> main
 
 var app = builder.Build();
 
@@ -16,6 +28,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+<<<<<<< feat/ui-upload-polish
+app.UseCors("ClientOrigin");
+=======
+>>>>>>> main
 app.UseAuthorization();
 
 // Map Controllers

@@ -45,7 +45,12 @@
           <span>or</span>
         </p>
 
-        <input type="file" (change)="onFileSelected($event)" />
+        <div class="file-input">
+          <input type="file" (change)="onFileSelected($event)" />
+          <div class="selected-file" *ngIf="selectedFile">
+            {{ selectedFile.name }} — {{ (selectedFile.size / 1024) | number:'1.0-0' }} KB
+          </div>
+        </div>
 
         <button
           mat-raised-button
@@ -58,11 +63,18 @@
           {{ isUploading ? 'Uploading...' : 'Upload File' }}
         </button>
 
+        <mat-progress-bar *ngIf="isUploading" mode="indeterminate"></mat-progress-bar>
+
       </div>
 
       <div class="response" *ngIf="uploadResponse">
         <strong>Server Response:</strong>
         <pre>{{ uploadResponse | json }}</pre>
+      </div>
+
+      <div class="upload-success" *ngIf="successMessage && !isUploading">
+        <mat-icon>check_circle</mat-icon>
+        {{ successMessage }}
       </div>
 
     </mat-card-content>

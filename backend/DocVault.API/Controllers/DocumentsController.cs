@@ -4,22 +4,27 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace DocVault.API.Controllers;
 
-// Controller for document upload operations.
-// Currently exposes ONLY POST /api/documents
-
 [ApiController]
 [Route("api/documents")]
 [Produces("application/json")]
 public class DocumentsController : ControllerBase
 {
-    // Max upload size: 100 MB
+    // Max upload size enforced at the controller level: 100 MB
     private const long MaxFileSizeBytes = 100 * 1024 * 1024;
 
+    // Allowed MIME types – extend as needed
     private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "image/jpeg",
-        "image/png"
+        "image/png",
+        "image/gif",
+        "text/plain",
+        "text/csv"
     };
 
     private readonly IDocumentService _documentService;
@@ -33,8 +38,20 @@ public class DocumentsController : ControllerBase
         _logger = logger;
     }
 
-    //  GET /api/documents 
-    // Returns all documents for the current user.
+    // ── GET /api/documents/health ───────────────────────────────────────────────
+
+    [HttpGet("health")]
+    [ProducesResponseType(typeof(HealthDto), StatusCodes.Status200OK)]
+    public IActionResult Health()
+    {
+        return Ok(new HealthDto(
+            Status: "Healthy",
+            Timestamp: DateTime.UtcNow,
+            Version: "1.0.0"
+        ));
+    }
+
+    // ── GET /api/documents ─────────────────────────────────────────────────────
 
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<DocumentDto>), StatusCodes.Status200OK)]
@@ -43,7 +60,6 @@ public class DocumentsController : ControllerBase
     {
         try
         {
-            // In a real app this comes from the auth token (e.g. User.FindFirst("sub")?.Value)
             var userId = GetUserId();
 
             var documents = await _documentService.GetDocumentsAsync(userId, ct);
@@ -56,25 +72,30 @@ public class DocumentsController : ControllerBase
         }
     }
 
-    //  POST /api/documents 
+    // ── POST /api/documents ────────────────────────────────────────────────────
 
     [HttpPost]
     [RequestSizeLimit(MaxFileSizeBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = MaxFileSizeBytes)]
     [ProducesResponseType(typeof(UploadResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponseDto), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponseDto), StatusCodes.Status413RequestEntityTooLarge)]
     [ProducesResponseType(typeof(ErrorResponseDto), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> UploadDocument(
         IFormFile file,
         CancellationToken ct)
     {
-        if (file == null || file.Length == 0)
-            return BadRequest(new ErrorResponseDto("File is required."));
+        if (file is null || file.Length == 0)
+            return BadRequest(new ErrorResponseDto("No file provided or file is empty."));
+
+        if (file.Length > MaxFileSizeBytes)
+            return StatusCode(413, new ErrorResponseDto(
+                $"File exceeds the maximum allowed size of {MaxFileSizeBytes / 1024 / 1024} MB."));
 
         if (!AllowedContentTypes.Contains(file.ContentType))
             return BadRequest(new ErrorResponseDto(
-                $"Unsupported content type: {file.ContentType}"
-            ));
+                $"Content type '{file.ContentType}' is not allowed.",
+                $"Allowed types: {string.Join(", ", AllowedContentTypes)}"));
 
         try
         {
@@ -90,20 +111,22 @@ public class DocumentsController : ControllerBase
                 userId,
                 ct);
 
-            return Created(string.Empty, result);
+            return CreatedAtAction(
+                nameof(GetDocuments),
+                new { id = result.Id },
+                result);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Upload failed");
-            return StatusCode(500,
-                new ErrorResponseDto("Failed to upload document.", ex.Message));
+            _logger.LogError(ex, "Error uploading document {FileName}", file.FileName);
+            return StatusCode(500, new ErrorResponseDto("Failed to upload the document.", ex.Message));
         }
     }
 
-    //  Helper method to get user ID (replace with real auth in production)
+    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private string GetUserId()
     {
-        return "anonymous"; // replace later with JWT claim
+        return "anonymous";
     }
 }

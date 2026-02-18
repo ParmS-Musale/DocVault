@@ -34,6 +34,16 @@ Thumbs.db
 logs/
 npm-debug.log*
 
+########################################
+# Docker
+########################################
+docker-compose.override.
+
+# Local development secrets
+DocVault.Api/appsettings.Development.json
+
+# Ignore development secrets
+appsettings.Development.json
 # ── Environment ───────────────────────────────────────────────────────────────
 .env
 .env.local

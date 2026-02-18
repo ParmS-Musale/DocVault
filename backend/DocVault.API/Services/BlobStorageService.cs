@@ -15,15 +15,18 @@ public class BlobStorageService : IBlobStorageService
     private bool _containerEnsured;
 
     public BlobStorageService(
-        IOptions<AzureStorageOptions> options,
-        ILogger<BlobStorageService> logger)
-    {
-        _logger = logger;
-        var opts = options.Value;
+    IOptions<AzureStorageOptions> options,
+    ILogger<BlobStorageService> logger)
+{
+    _logger = logger;
+    var opts = options.Value;
 
-        var serviceClient = new BlobServiceClient(opts.ConnectionString);
-        _containerClient = serviceClient.GetBlobContainerClient(opts.ContainerName);
-    }
+    _logger.LogInformation("Azure ConnectionString = {cs}", opts.ConnectionString);
+    _logger.LogInformation("Azure ContainerName = {container}", opts.ContainerName);
+
+    var serviceClient = new BlobServiceClient(opts.ConnectionString);
+    _containerClient = serviceClient.GetBlobContainerClient(opts.ContainerName);
+}
 
     private async Task EnsureContainerExistsAsync(CancellationToken ct = default)
     {

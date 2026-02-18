@@ -51,15 +51,15 @@
 
 ## Tech Stack
 
-| Layer     | Technology                     | Version  |
-|-----------|-------------------------------|----------|
-| Frontend  | Angular (standalone components) | 17.3+  |
-| UI Kit    | Angular Material               | 17.3+    |
-| Backend   | ASP.NET Core Web API           | .NET 8   |
-| Storage   | Azure Blob Storage (SDK v12)   | 12.21+   |
-| Database  | Azure Cosmos DB (Core SQL)     | 3.39+    |
-| CI/CD     | GitHub Actions                 | Latest   |
-| Cloud     | Microsoft Azure                | –        |
+| Layer    | Technology                      | Version |
+| -------- | ------------------------------- | ------- |
+| Frontend | Angular (standalone components) | 17.3+   |
+| UI Kit   | Angular Material                | 17.3+   |
+| Backend  | ASP.NET Core Web API            | .NET 8  |
+| Storage  | Azure Blob Storage (SDK v12)    | 12.21+  |
+| Database | Azure Cosmos DB (Core SQL)      | 3.39+   |
+| CI/CD    | GitHub Actions                  | Latest  |
+| Cloud    | Microsoft Azure                 | –       |
 
 ---
 
@@ -130,13 +130,13 @@ docvault/
 
 ## Prerequisites
 
-| Tool            | Minimum Version | Install                              |
-|-----------------|-----------------|--------------------------------------|
-| Node.js         | 20.x            | https://nodejs.org                   |
-| Angular CLI     | 17.3+           | `npm i -g @angular/cli`              |
-| .NET SDK        | 8.0             | https://dotnet.microsoft.com/download |
-| Azure CLI       | 2.56+           | https://aka.ms/installazurecliwindows |
-| Git             | Any             | https://git-scm.com                  |
+| Tool        | Minimum Version | Install                               |
+| ----------- | --------------- | ------------------------------------- |
+| Node.js     | 20.x            | https://nodejs.org                    |
+| Angular CLI | 17.3+           | `npm i -g @angular/cli`               |
+| .NET SDK    | 8.0             | https://dotnet.microsoft.com/download |
+| Azure CLI   | 2.56+           | https://aka.ms/installazurecliwindows |
+| Git         | Any             | https://git-scm.com                   |
 
 ---
 
@@ -151,24 +151,25 @@ cd docvault
 
 ### 2. Configure the Backend
 
-Edit `backend/DocVault.API/appsettings.json` and replace the placeholder values:
+Create your local development settings file:
 
-```json
-{
-  "AzureStorage": {
-    "ConnectionString": "DefaultEndpointsProtocol=https;AccountName=...",
-    "ContainerName": "docvault-files"
-  },
-  "CosmosDb": {
-    "ConnectionString": "AccountEndpoint=https://...;AccountKey=...",
-    "DatabaseName": "DocVaultDB",
-    "ContainerName": "Documents"
-  },
-  "AllowedOrigins": ["http://localhost:4200"]
-}
-```
+Windows (PowerShell):
+copy appsettings.Development.template.json appsettings.Development.json
 
-> ⚠️ **Never commit real credentials.** Use environment variables or dotnet user-secrets locally:
+Mac / Linux:
+cp appsettings.Development.template.json appsettings.Development.json
+
+Open `appsettings.Development.json` and replace:
+
+- YOUR_STORAGE_CONNECTION_STRING
+- YOUR_COSMOS_CONNECTION_STRING
+
+`appsettings.Development.json` contains secrets and is ignored by Git.
+Never commit this file.
+
+````
+
+> **Never commit real credentials.** Use environment variables or dotnet user-secrets locally:
 > ```bash
 > cd backend/DocVault.API
 > dotnet user-secrets set "AzureStorage:ConnectionString" "your-connection-string"
@@ -186,7 +187,7 @@ dotnet run
 # → http://localhost:5000
 # → https://localhost:5001
 # → Swagger UI: http://localhost:5000/swagger
-```
+````
 
 ### 4. Run the Angular Frontend
 
@@ -218,6 +219,7 @@ az login
 ```
 
 The script provisions:
+
 - Resource Group
 - Storage Account + Blob Container
 - Blob Lifecycle Policy (Cool @ 30d, Archive @ 180d)
@@ -231,19 +233,19 @@ The script provisions:
 
 ### Backend – appsettings.json
 
-| Key | Description |
-|-----|-------------|
+| Key                             | Description                    |
+| ------------------------------- | ------------------------------ |
 | `AzureStorage:ConnectionString` | Blob Storage connection string |
-| `AzureStorage:ContainerName`    | Blob container name |
-| `CosmosDb:ConnectionString`     | Cosmos DB connection string |
-| `CosmosDb:DatabaseName`         | Cosmos DB database name |
-| `CosmosDb:ContainerName`        | Cosmos DB container name |
-| `AllowedOrigins`                | CORS allowed origins array |
+| `AzureStorage:ContainerName`    | Blob container name            |
+| `CosmosDb:ConnectionString`     | Cosmos DB connection string    |
+| `CosmosDb:DatabaseName`         | Cosmos DB database name        |
+| `CosmosDb:ContainerName`        | Cosmos DB container name       |
+| `AllowedOrigins`                | CORS allowed origins array     |
 
 ### Frontend – environment.ts
 
-| Key | Description |
-|-----|-------------|
+| Key          | Description              |
+| ------------ | ------------------------ |
 | `apiBaseUrl` | Base URL of the .NET API |
 
 ---
@@ -251,9 +253,11 @@ The script provisions:
 ## API Reference
 
 ### `GET /api/documents/health`
+
 Returns API liveness status.
 
 **Response 200:**
+
 ```json
 { "status": "Healthy", "timestamp": "2025-01-01T00:00:00Z", "version": "1.0.0" }
 ```
@@ -261,47 +265,53 @@ Returns API liveness status.
 ---
 
 ### `GET /api/documents`
+
 Returns all documents for the current user, each with a fresh SAS download URL.
 
 **Response 200:**
+
 ```json
 [
-  {
-    "id": "abc123",
-    "fileName": "report.pdf",
-    "fileSize": 204800,
-    "contentType": "application/pdf",
-    "uploadDate": "2025-01-01T10:30:00Z",
-    "downloadUrl": "https://storage.blob.core.windows.net/...?sig=..."
-  }
+	{
+		"id": "abc123",
+		"fileName": "report.pdf",
+		"fileSize": 204800,
+		"contentType": "application/pdf",
+		"uploadDate": "2025-01-01T10:30:00Z",
+		"downloadUrl": "https://storage.blob.core.windows.net/...?sig=..."
+	}
 ]
 ```
 
 ---
 
 ### `POST /api/documents`
+
 Uploads a document via `multipart/form-data`.
 
 **Request:**
+
 ```
 Content-Type: multipart/form-data
 Body: file=<binary>
 ```
 
 **Constraints:**
+
 - Max file size: **100 MB**
 - Allowed types: PDF, DOCX, XLSX, JPG, PNG, GIF, TXT, CSV
 
 **Response 201:**
+
 ```json
 {
-  "id": "abc123",
-  "fileName": "report.pdf",
-  "fileSize": 204800,
-  "contentType": "application/pdf",
-  "uploadDate": "2025-01-01T10:30:00Z",
-  "downloadUrl": "https://storage.blob.core.windows.net/...?sig=...",
-  "message": "File uploaded successfully."
+	"id": "abc123",
+	"fileName": "report.pdf",
+	"fileSize": 204800,
+	"contentType": "application/pdf",
+	"uploadDate": "2025-01-01T10:30:00Z",
+	"downloadUrl": "https://storage.blob.core.windows.net/...?sig=...",
+	"message": "File uploaded successfully."
 }
 ```
 
@@ -311,19 +321,19 @@ Body: file=<binary>
 
 ### Required GitHub Secrets
 
-| Secret | How to Obtain |
-|--------|---------------|
-| `AZURE_WEBAPP_NAME` | Your App Service name |
-| `AZURE_WEBAPP_PUBLISH_PROFILE` | Azure Portal → App Service → Get Publish Profile |
-| `ANGULAR_API_BASE_URL` | Your API URL e.g. `https://your-api.azurewebsites.net/api` |
+| Secret                         | How to Obtain                                              |
+| ------------------------------ | ---------------------------------------------------------- |
+| `AZURE_WEBAPP_NAME`            | Your App Service name                                      |
+| `AZURE_WEBAPP_PUBLISH_PROFILE` | Azure Portal → App Service → Get Publish Profile           |
+| `ANGULAR_API_BASE_URL`         | Your API URL e.g. `https://your-api.azurewebsites.net/api` |
 
 ### Workflow Triggers
 
-| Trigger | Action |
-|---------|--------|
-| Push to `main` | Build + Deploy |
-| Pull Request to `main` | Build only (no deploy) |
-| Manual (`workflow_dispatch`) | Build + Deploy |
+| Trigger                      | Action                 |
+| ---------------------------- | ---------------------- |
+| Push to `main`               | Build + Deploy         |
+| Pull Request to `main`       | Build only (no deploy) |
+| Manual (`workflow_dispatch`) | Build + Deploy         |
 
 ---
 
@@ -340,9 +350,9 @@ Body: file=<binary>
 
 ## Blob Lifecycle Policy
 
-| Tier | Triggered After |
-|------|----------------|
-| **Hot → Cool** | 30 days since last modification |
+| Tier               | Triggered After                  |
+| ------------------ | -------------------------------- |
+| **Hot → Cool**     | 30 days since last modification  |
 | **Cool → Archive** | 180 days since last modification |
 
 Archived blobs require rehydration before download (~1–15 hours).

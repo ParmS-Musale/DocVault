@@ -33,7 +33,30 @@ public class DocumentsController : ControllerBase
         _logger = logger;
     }
 
-    // ── POST /api/documents ─────────────────────────────────────────────────────
+    //  GET /api/documents 
+    // Returns all documents for the current user.
+
+    [HttpGet]
+    [ProducesResponseType(typeof(IReadOnlyList<DocumentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponseDto), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetDocuments(CancellationToken ct)
+    {
+        try
+        {
+            // In a real app this comes from the auth token (e.g. User.FindFirst("sub")?.Value)
+            var userId = GetUserId();
+
+            var documents = await _documentService.GetDocumentsAsync(userId, ct);
+            return Ok(documents);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving documents");
+            return StatusCode(500, new ErrorResponseDto("Failed to retrieve documents.", ex.Message));
+        }
+    }
+
+    //  POST /api/documents 
 
     [HttpPost]
     [RequestSizeLimit(MaxFileSizeBytes)]
@@ -77,7 +100,7 @@ public class DocumentsController : ControllerBase
         }
     }
 
-    // ── Helper ──────────────────────────────────────────────────────────────────
+    //  Helper method to get user ID (replace with real auth in production)
 
     private string GetUserId()
     {

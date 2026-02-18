@@ -250,6 +250,15 @@ The script provisions:
 
 ## API Reference
 
+### `GET /api/documents`
+Returns all documents for the current user, each with a fresh SAS download URL.
+
+**Response 200:**
+```json
+[
+  Details of all documents.
+]
+
 ### `POST /api/documents`
 Uploads a document via `multipart/form-data`.
 

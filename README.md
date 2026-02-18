@@ -1,324 +1,349 @@
-# DocVault
+# DocVault 🗄️
 
-DocVault is a minimal ASP.NET Core Web API for document upload and basic health checks. It exposes simple endpoints to verify the API and upload files to a local folder.
+> **Production-ready document management application** built with Angular 17+, .NET 8 Web API, Azure Blob Storage, and Azure Cosmos DB.
 
-## Features
-- Health endpoint to confirm the API is running
-- Basic documents endpoint placeholder
-- File upload via multipart/form-data to an Uploads folder
-- Swagger/OpenAPI UI enabled in Development
-
-## Prerequisites
-- .NET SDK 8.0
-
-## Getting Started
-1. Restore dependencies:
-
-```bash
-dotnet restore
-```
-
-2. Run the API:
-
-```bash
-dotnet run --project DocVault.API
-```
-
-3. Open Swagger UI (Development only):
-- https://localhost:7120/swagger
-- http://localhost:5055/swagger
-
-## API Endpoints
-- GET /api/documents/health — returns API health status
-- GET /api/documents — sample endpoint to confirm routing
-- POST /api/documents/upload — uploads a file (multipart/form-data, field name: file)
-
-## Examples
-Health:
-
-```bash
-curl -X GET https://localhost:7120/api/documents/health
-```
-
-Upload (replace path with your file):
-
-```bash
-curl -X POST https://localhost:7120/api/documents/upload \
-  -F "file=@C:/path/to/your/file.pdf"
-```
-
-## Storage
-- Uploaded files are saved to DocVault.API/Uploads
-- Folder is created automatically if it does not exist
-
-## Project Structure
-- DocVault.API — ASP.NET Core Web API project
-  - Controllers/DocumentsController.cs — upload, health, and sample endpoints
-  - Program.cs — service and pipeline setup
-  - Properties/launchSettings.json — local URLs and profiles
-  - appsettings.json — basic configuration
-
-## Notes
-- Swagger UI is available only when ASPNETCORE_ENVIRONMENT=Development
-- CI is pre-configured with a placeholder workflow under .github/workflows/ci.yml
-
-## Code References
-- [Program.cs](file:///c:/Users/Parm's%20Musale/OneDrive/Desktop/DocVault/DocVault.API/Program.cs)
-- [DocumentsController.cs](file:///c:/Users/Parm's%20Musale/OneDrive/Desktop/DocVault/DocVault.API/Controllers/DocumentsController.cs)
-- [launchSettings.json](file:///c:/Users/Parm's%20Musale/OneDrive/Desktop/DocVault/DocVault.API/Properties/launchSettings.json)
-# DocVault — Secure Document Management Platform
-
-> **AZ-204 Capstone Project** | Angular + .NET 8 | 4-Day Sprint
-
-DocVault is an internal document management platform where employees can upload, search, and download files. Every Azure service used has a genuine architectural reason — the goal is to wire real Azure services together and be able to explain every decision.
+![DocVault Architecture](docs/architecture.png)
 
 ---
 
 ## Table of Contents
 
-- [Project Structure](#project-structure)
-- [Azure Services](#azure-services)
-- [Prerequisites](#prerequisites)
-- [Local Development Setup](#local-development-setup)
-- [Environment Variables & Secrets](#environment-variables--secrets)
-- [Running the App Locally](#running-the-app-locally)
-- [Git & Branching Workflow](#git--branching-workflow)
-- [CI/CD Pipeline](#cicd-pipeline)
-- [API Endpoints](#api-endpoints)
+1. [Architecture Overview](#architecture-overview)
+2. [Tech Stack](#tech-stack)
+3. [Project Structure](#project-structure)
+4. [Prerequisites](#prerequisites)
+5. [Local Development Setup](#local-development-setup)
+6. [Azure Infrastructure Setup](#azure-infrastructure-setup)
+7. [Environment Configuration](#environment-configuration)
+8. [API Reference](#api-reference)
+9. [CI/CD Deployment](#cicd-deployment)
+10. [Security Considerations](#security-considerations)
+11. [Blob Lifecycle Policy](#blob-lifecycle-policy)
 
 ---
 
-## Azure Services
+## Architecture Overview
 
-| Service | Purpose in DocVault ||
-|---|---|---|
-| Azure App Service | Hosts the .NET 8 Web API and Angular SPA 
-| Azure Blob Storage | Stores uploaded documents and generated thumbnails |
-| Azure Cosmos DB | Stores document metadata, tags, and audit logs (NoSQL) | 
-| Azure Functions | Blob-triggered function for PDF thumbnail generation and text extraction | 
-| Microsoft Entra ID | Authenticates users via MSAL; protects API with bearer tokens | 
-| Azure Key Vault | Stores Cosmos DB keys, Storage connection strings, and third-party API keys | 
-| Managed Identity | Allows App Service and Functions to access Key Vault and Storage without secrets in code | 
-| Application Insights | API and Functions telemetry, custom metrics, availability tests |
-| Azure API Management | Exposes the .NET API with rate-limiting and caching policies |
-| Azure Event Grid | Publishes events when documents are uploaded or processed |
-| Azure Service Bus | Reliable job queuing for document processing tasks | 
-| Azure Container Apps | Optional containerised deployment with auto-scaling | 
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        User Browser                          │
+└────────────────────────┬────────────────────────────────────┘
+                         │ HTTPS
+┌────────────────────────▼────────────────────────────────────┐
+│              Angular 17+ SPA (standalone components)        │
+│         Home │ Upload (drag & drop) │ Document List         │
+└────────────────────────┬────────────────────────────────────┘
+                         │ REST API calls
+┌────────────────────────▼────────────────────────────────────┐
+│               .NET 8 Web API (Azure App Service)            │
+│         DocumentsController → DocumentService               │
+└──────────────┬─────────────────────────┬────────────────────┘
+               │                         │
+┌──────────────▼──────────┐  ┌───────────▼──────────────────┐
+│  Azure Blob Storage     │  │  Azure Cosmos DB (Core SQL)  │
+│  - Raw file storage     │  │  - Document metadata         │
+│  - SAS URL generation   │  │  - Partitioned by /userId    │
+│  - Lifecycle policies   │  │  - Session consistency       │
+└─────────────────────────┘  └──────────────────────────────┘
+```
+
+---
+
+## Tech Stack
+
+| Layer     | Technology                     | Version  |
+|-----------|-------------------------------|----------|
+| Frontend  | Angular (standalone components) | 17.3+  |
+| UI Kit    | Angular Material               | 17.3+    |
+| Backend   | ASP.NET Core Web API           | .NET 8   |
+| Storage   | Azure Blob Storage (SDK v12)   | 12.21+   |
+| Database  | Azure Cosmos DB (Core SQL)     | 3.39+    |
+| CI/CD     | GitHub Actions                 | Latest   |
+| Cloud     | Microsoft Azure                | –        |
+
+---
+
+## Project Structure
+
+```
+docvault/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml                # GitHub Actions CI/CD
+│
+├── backend/
+│   └── DocVault.API/
+│       ├── Configuration/
+│       │   └── AzureOptions.cs       # Strongly-typed config
+│       ├── Controllers/
+│       │   └── DocumentsController.cs
+│       ├── DTOs/
+│       │   └── DocumentDtos.cs       # Request/response contracts
+│       ├── Interfaces/
+│       │   └── IServices.cs          # Service abstractions
+│       ├── Models/
+│       │   └── DocumentRecord.cs     # Cosmos DB entity
+│       ├── Services/
+│       │   ├── BlobStorageService.cs
+│       │   ├── CosmosDbService.cs
+│       │   └── DocumentService.cs    # Orchestration layer
+│       ├── Properties/
+│       │   └── launchSettings.json
+│       ├── appsettings.json
+│       ├── appsettings.Development.json
+│       └── Program.cs
+│
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── components/
+│   │   │   │   ├── home/
+│   │   │   │   │   └── home.component.ts
+│   │   │   │   ├── upload/
+│   │   │   │   │   └── upload.component.ts
+│   │   │   │   ├── document-list/
+│   │   │   │   │   └── document-list.component.ts
+│   │   │   │   └── shared/nav/
+│   │   │   │       └── nav.component.ts
+│   │   │   ├── models/
+│   │   │   │   └── document.model.ts
+│   │   │   ├── services/
+│   │   │   │   └── document.service.ts
+│   │   │   ├── app.component.ts
+│   │   │   ├── app.config.ts
+│   │   │   └── app.routes.ts
+│   │   ├── environments/
+│   │   │   ├── environment.ts        # Dev
+│   │   │   └── environment.prod.ts   # Prod
+│   │   ├── index.html
+│   │   ├── main.ts
+│   │   └── styles.scss
+│   ├── angular.json
+│   ├── package.json
+│   └── tsconfig.json
+│
+└── infrastructure/
+    └── setup-azure.sh                # Azure CLI provisioning script
+```
 
 ---
 
 ## Prerequisites
 
-Before writing any code, make sure every team member has the following installed and configured.
-
-**Tooling**
-- [.NET 8 SDK](https://dotnet.microsoft.com/download)
-- [Node.js 20+](https://nodejs.org/) and npm
-- [Angular CLI](https://angular.io/cli) — `npm install -g @angular/cli`
-- [Azure Functions Core Tools v4](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local)
-- [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
-- [Git](https://git-scm.com/)
-
-**Azure Access**
-- An active Azure subscription with Contributor access
-- Permissions to register an app in Microsoft Entra ID
-- Access to the shared Azure resource group for this project
-
-**IDE**
-- Visual Studio 2022 or VS Code with the C# Dev Kit and Azure extensions
+| Tool            | Minimum Version | Install                              |
+|-----------------|-----------------|--------------------------------------|
+| Node.js         | 20.x            | https://nodejs.org                   |
+| Angular CLI     | 17.3+           | `npm i -g @angular/cli`              |
+| .NET SDK        | 8.0             | https://dotnet.microsoft.com/download |
+| Azure CLI       | 2.56+           | https://aka.ms/installazurecliwindows |
+| Git             | Any             | https://git-scm.com                  |
 
 ---
 
 ## Local Development Setup
 
-### 1. Clone the repository
+### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/<your-org>/docvault.git
+git clone https://github.com/your-org/docvault.git
 cd docvault
 ```
 
-### 2. Install API dependencies
+### 2. Configure the Backend
+
+Edit `backend/DocVault.API/appsettings.json` and replace the placeholder values:
+
+```json
+{
+  "AzureStorage": {
+    "ConnectionString": "DefaultEndpointsProtocol=https;AccountName=...",
+    "ContainerName": "docvault-files"
+  },
+  "CosmosDb": {
+    "ConnectionString": "AccountEndpoint=https://...;AccountKey=...",
+    "DatabaseName": "DocVaultDB",
+    "ContainerName": "Documents"
+  },
+  "AllowedOrigins": ["http://localhost:4200"]
+}
+```
+
+> ⚠️ **Never commit real credentials.** Use environment variables or dotnet user-secrets locally:
+> ```bash
+> cd backend/DocVault.API
+> dotnet user-secrets set "AzureStorage:ConnectionString" "your-connection-string"
+> dotnet user-secrets set "CosmosDb:ConnectionString" "your-cosmos-string"
+> ```
+
+### 3. Run the Backend API
 
 ```bash
-cd src/DocVault.API
+cd backend/DocVault.API
 dotnet restore
-```
-
-### 3. Install Angular dependencies
-
-```bash
-cd client
-npm install
-```
-
-### 4. Configure local secrets
-
-**Never commit secrets.** Copy the example config and fill in your values:
-
-```bash
-# For the API
-cp src/DocVault.API/appsettings.Example.json src/DocVault.API/appsettings.Development.json
-
-# For Azure Functions
-cp src/DocVault.Functions/local.settings.Example.json src/DocVault.Functions/local.settings.json
-```
-
-Then open each file and replace the placeholder values with your actual connection strings and keys. See [Environment Variables & Secrets](#environment-variables--secrets) for the full list.
-
----
-
-## Environment Variables & Secrets
-
-**These files are git-ignored. Never commit them.**
-
-`appsettings.Development.json` (API)
-
-```json
-{
-  "AzureAd": {
-    "TenantId": "<your-tenant-id>",
-    "ClientId": "<your-client-id>"
-  },
-  "KeyVault": {
-    "Uri": "https://<your-keyvault-name>.vault.azure.net/"
-  },
-  "ApplicationInsights": {
-    "ConnectionString": "<your-app-insights-connection-string>"
-  }
-}
-```
-
-`local.settings.json` (Azure Functions)
-
-```json
-{
-  "IsEncrypted": false,
-  "Values": {
-    "AzureWebJobsStorage": "<your-storage-connection-string>",
-    "BlobContainerName": "documents",
-    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"
-  }
-}
-```
-
-In production, all secrets are stored in **Azure Key Vault** and accessed via **Managed Identity** — no connection strings in application code or environment variables on the server.
-
----
-
-## Running the App Locally
-
-### Start the API
-
-```bash
-cd src/DocVault.API
 dotnet run
-# API available at https://localhost:7001
+
+# API will be available at:
+# → http://localhost:5000
+# → https://localhost:5001
+# → Swagger UI: http://localhost:5000/swagger
 ```
 
-### Start Azure Functions
+### 4. Run the Angular Frontend
 
 ```bash
-cd src/DocVault.Functions
-func start
+cd frontend
+npm install
+npm start
+
+# Angular dev server: http://localhost:4200
 ```
 
-### Start the Angular app
+The frontend proxies API calls to `http://localhost:5000/api` by default.
+
+### 5. Verify the Setup
+
+- Open http://localhost:4200 — you should see the DocVault home page
+- Open http://localhost:5000/swagger — API documentation
+- Open http://localhost:5000/api/documents/health — health check
+
+---
+
+## Azure Infrastructure Setup
 
 ```bash
-cd client
-ng serve
-# App available at http://localhost:4200
+cd infrastructure
+chmod +x setup-azure.sh
+az login
+./setup-azure.sh
 ```
 
-### Run tests
+The script provisions:
+- Resource Group
+- Storage Account + Blob Container
+- Blob Lifecycle Policy (Cool @ 30d, Archive @ 180d)
+- Cosmos DB Account, Database, Container (`/userId` partition key)
+- App Service Plan (Linux B2)
+- App Service Web App (.NET 8)
 
-```bash
-# API unit tests
-cd src/DocVault.Tests
-dotnet test
+---
 
-# Angular unit tests
-cd client
-ng test
+## Environment Configuration
+
+### Backend – appsettings.json
+
+| Key | Description |
+|-----|-------------|
+| `AzureStorage:ConnectionString` | Blob Storage connection string |
+| `AzureStorage:ContainerName`    | Blob container name |
+| `CosmosDb:ConnectionString`     | Cosmos DB connection string |
+| `CosmosDb:DatabaseName`         | Cosmos DB database name |
+| `CosmosDb:ContainerName`        | Cosmos DB container name |
+| `AllowedOrigins`                | CORS allowed origins array |
+
+### Frontend – environment.ts
+
+| Key | Description |
+|-----|-------------|
+| `apiBaseUrl` | Base URL of the .NET API |
+
+---
+
+## API Reference
+
+### `GET /api/documents/health`
+Returns API liveness status.
+
+**Response 200:**
+```json
+{ "status": "Healthy", "timestamp": "2025-01-01T00:00:00Z", "version": "1.0.0" }
 ```
 
 ---
 
-## Git & Branching Workflow
+### `GET /api/documents`
+Returns all documents for the current user, each with a fresh SAS download URL.
 
-This project follows a strict branching strategy. Reviewers will check the commit history and PR trail during the demo evaluation.
-
-### Branches
-
-| Branch | Purpose |
-|---|---|
-| `main` | Protected. Production-ready code only. No direct pushes. |
-| `dev` | Integration branch. All features merge here first. |
-| `feature/<name>` | Short-lived branch per task (e.g. `feature/upload-api`, `feature/entra-auth`). |
-
-### Commit Rules
-
-- Commit every time you finish a logical unit of work (a working endpoint, a component, a config change). **Aim for 5+ commits per person per day.**
-- Use the format: `type(scope): description`
-  - `feat(api): add upload endpoint with blob storage`
-  - `fix(auth): correct MSAL redirect URI`
-  - `chore(infra): add Key Vault resource to setup script`
-- **Never commit secrets.** Use environment variables or Key Vault.
-- **Never push directly to `main` or `dev`.**
-
-### Pull Request Rules
-
-- Every feature branch requires a PR to merge into `dev`. No exceptions.
-- At least one team member must review and approve before merging.
-- Every PR description must answer three questions:
-  1. What does this change?
-  2. Which Azure service does it touch?
-  3. How do I test it?
-- Keep PRs small — if a feature is large, split it (e.g. API endpoint first, then the Angular component).
-- Resolve merge conflicts on your feature branch before requesting review.
+**Response 200:**
+```json
+[
+  {
+    "id": "abc123",
+    "fileName": "report.pdf",
+    "fileSize": 204800,
+    "contentType": "application/pdf",
+    "uploadDate": "2025-01-01T10:30:00Z",
+    "downloadUrl": "https://storage.blob.core.windows.net/...?sig=..."
+  }
+]
+```
 
 ---
 
-## CI/CD Pipeline
+### `POST /api/documents`
+Uploads a document via `multipart/form-data`.
 
-Two GitHub Actions workflows run automatically. **A failing CI check blocks the PR from merging.**
+**Request:**
+```
+Content-Type: multipart/form-data
+Body: file=<binary>
+```
 
-### `ci.yml` — triggered on every PR to `dev` and `main`
+**Constraints:**
+- Max file size: **100 MB**
+- Allowed types: PDF, DOCX, XLSX, JPG, PNG, GIF, TXT, CSV
 
-1. Checkout code
-2. `dotnet restore` + `dotnet build` + `dotnet test`
-3. `npm install` + `ng build`
-4. Report status back to the PR
-
-### `deploy.yml` — triggered on push to `main` only
-
-1. Run all CI steps
-2. Publish the .NET API
-3. Build the Angular app for production
-4. Deploy API to Azure App Service
-5. Deploy Angular to Azure Static Web Apps
-
-Azure credentials are stored as **GitHub Secrets** (`AZURE_PUBLISH_PROFILE`). They are never hardcoded.
-
----
-
-## API Endpoints
-
-> This section will be filled in as endpoints are built. Add your endpoint here when you raise the PR.
-
-| Method | Route | Description | Auth Required |
-|---|---|---|---|
-| `POST` | `/api/documents` | Upload a document | Yes |
-| `GET` | `/api/documents` | List/search documents | Yes |
-| `GET` | `/api/documents/{id}` | Get document metadata | Yes |
-| `GET` | `/api/documents/{id}/download` | Download document file | Yes |
-| `DELETE` | `/api/documents/{id}` | Delete a document | Yes |
+**Response 201:**
+```json
+{
+  "id": "abc123",
+  "fileName": "report.pdf",
+  "fileSize": 204800,
+  "contentType": "application/pdf",
+  "uploadDate": "2025-01-01T10:30:00Z",
+  "downloadUrl": "https://storage.blob.core.windows.net/...?sig=...",
+  "message": "File uploaded successfully."
+}
+```
 
 ---
 
-## Notes
+## CI/CD Deployment
 
-- The goal is not pixel-perfect UI — the goal is correctly wired Azure services that you can explain.
-- Every architectural decision should have an answer to: *"Why this service and not something else?"*
-- If you're unsure where a secret should go, the answer is always **Key Vault**.
+### Required GitHub Secrets
+
+| Secret | How to Obtain |
+|--------|---------------|
+| `AZURE_WEBAPP_NAME` | Your App Service name |
+| `AZURE_WEBAPP_PUBLISH_PROFILE` | Azure Portal → App Service → Get Publish Profile |
+| `ANGULAR_API_BASE_URL` | Your API URL e.g. `https://your-api.azurewebsites.net/api` |
+
+### Workflow Triggers
+
+| Trigger | Action |
+|---------|--------|
+| Push to `main` | Build + Deploy |
+| Pull Request to `main` | Build only (no deploy) |
+| Manual (`workflow_dispatch`) | Build + Deploy |
+
+---
+
+## Security Considerations
+
+- **SAS URLs** are generated per-request with a 1-hour TTL — blobs are never publicly accessible
+- **Private container** — no anonymous blob access
+- **TLS enforced** — HTTPS only on both storage and app service
+- **Input validation** — file type whitelist + 100 MB size limit
+- **CORS** — restrict `AllowedOrigins` to your production Angular domain
+- **Production auth** — replace `GetUserId()` in the controller with JWT claim extraction
+
+---
+
+## Blob Lifecycle Policy
+
+| Tier | Triggered After |
+|------|----------------|
+| **Hot → Cool** | 30 days since last modification |
+| **Cool → Archive** | 180 days since last modification |
+
+Archived blobs require rehydration before download (~1–15 hours).
+Adjust thresholds in `setup-azure.sh` to match your retention needs.

@@ -45,9 +45,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseCors("DocVaultCors");
 app.UseAuthorization();
 app.MapControllers();
 
-app.Run();

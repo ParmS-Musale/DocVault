@@ -34,6 +34,8 @@ Thumbs.db
 logs/
 npm-debug.log*
 
+<<<<<<< HEAD
+=======
 ########################################
 # Docker
 ########################################
@@ -44,7 +46,13 @@ DocVault.Api/appsettings.Development.json
 
 # Ignore development secrets
 appsettings.Development.json
+>>>>>>> 3e62e7eea8dcbaf4021bf945afd043f7e25f013c
 # ── Environment ───────────────────────────────────────────────────────────────
 .env
 .env.local
 .env.production
+<<<<<<< HEAD
+#---secret keys
+**/appsettings.Development.json
+=======
+>>>>>>> 3e62e7eea8dcbaf4021bf945afd043f7e25f013c

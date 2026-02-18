@@ -1,3 +1,5 @@
+using Azure.Identity;
+using Microsoft.Extensions.Configuration;
 using DocVault.API.Configuration;
 using DocVault.API.Interfaces;
 using DocVault.API.Services;
@@ -6,6 +8,17 @@ using Microsoft.IdentityModel.Tokens;
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Azure Key Vault setup (Managed Identity)
+
+if (!builder.Environment.IsDevelopment())
+{
+    var keyVaultUri = new Uri("https://docvault-kv-prajwal.vault.azure.net/");
+    builder.Configuration.AddAzureKeyVault(
+        keyVaultUri,
+        new DefaultAzureCredential()
+    );
+}
 
 // ── Configuration ──────────────────────────────────────────────────────────────
 builder.Services.Configure<AzureStorageOptions>(

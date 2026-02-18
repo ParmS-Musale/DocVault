@@ -1,0 +1,135 @@
+// ────────────────────────────────────────────────────────────────────────────
+// DocVault – Global Styles
+// Uses CSS custom properties (design tokens) for consistent theming.
+// ────────────────────────────────────────────────────────────────────────────
+
+@use '@angular/material' as mat;
+
+// ── Import Material base styles (required for standalone setup) ───────────
+@include mat.core();
+
+// ── Design Tokens ──────────────────────────────────────────────────────────
+:root {
+  --primary:        #3f51b5;
+  --primary-dark:   #283593;
+  --primary-light:  #e8eaf6;
+  --accent:         #651fff;
+  --warn:           #e53935;
+  --success:        #43a047;
+  --bg-surface:     #f5f7fa;
+  --bg-card:        #ffffff;
+  --text-primary:   #1a1a2e;
+  --text-secondary: #64748b;
+  --border:         rgba(0,0,0,0.08);
+  --shadow-sm:      0 1px 4px rgba(0,0,0,0.08);
+  --shadow-md:      0 4px 16px rgba(0,0,0,0.10);
+  --shadow-lg:      0 8px 32px rgba(0,0,0,0.12);
+  --radius-sm:      8px;
+  --radius-md:      16px;
+  --radius-lg:      24px;
+  --transition:     all 0.2s ease;
+}
+
+// ── Base Reset ─────────────────────────────────────────────────────────────
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Google Sans', 'Roboto', 'Segoe UI', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// ── Typography ─────────────────────────────────────────────────────────────
+h1, h2, h3, h4 {
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+p { color: var(--text-secondary); }
+a { text-decoration: none; color: var(--primary); }
+a:hover { text-decoration: underline; }
+
+// ── Angular Material Overrides ─────────────────────────────────────────────
+
+// Cards: elevation + radius
+.mat-mdc-card {
+  background: var(--bg-card) !important;
+  box-shadow: var(--shadow-sm) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+// Buttons
+.mat-mdc-raised-button.mat-primary {
+  border-radius: var(--radius-sm) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+}
+
+// Form fields
+.mat-mdc-form-field.mat-focused .mdc-notched-outline__notch {
+  border-color: var(--primary) !important;
+}
+
+// Table rows
+.mat-mdc-row:hover { background: rgba(63,81,181,0.04) !important; }
+
+// Toolbar
+.mat-toolbar.mat-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
+}
+
+// Snackbar
+.snack-success .mdc-snackbar__surface {
+  background: var(--success) !important;
+  color: #fff !important;
+}
+.snack-error .mdc-snackbar__surface {
+  background: var(--warn) !important;
+  color: #fff !important;
+}
+
+// Progress bar
+.mat-mdc-progress-bar {
+  --mdc-linear-progress-active-indicator-color: var(--primary);
+}
+
+// ── Scrollbar Styling ──────────────────────────────────────────────────────
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.35); }
+
+// ── Utility Classes ────────────────────────────────────────────────────────
+.text-primary   { color: var(--primary) !important; }
+.text-secondary { color: var(--text-secondary) !important; }
+.text-success   { color: var(--success) !important; }
+.text-error     { color: var(--warn) !important; }
+.mt-auto { margin-top: auto; }
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// ── Page Transitions (Angular view transitions) ───────────────────────────
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+router-outlet + * { animation: fadeIn 0.25s ease; }

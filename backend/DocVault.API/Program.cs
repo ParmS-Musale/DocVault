@@ -1,6 +1,9 @@
 using DocVault.API.Configuration;
 using DocVault.API.Interfaces;
 using DocVault.API.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +25,26 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new() { Title = "DocVault API", Version = "v1" });
 });
+
+// ── JWT Authentication (Entra ID) ──────────────────────────────────────────────
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        var azureAd = builder.Configuration.GetSection("AzureAd");
+
+        options.Authority =
+            $"{azureAd["Instance"]}{azureAd["TenantId"]}/v2.0";
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidAudience = azureAd["Audience"],
+            ValidateLifetime = true
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 // ── CORS – allow Angular dev server and deployed URL ──────────────────────────
 builder.Services.AddCors(options =>
@@ -47,6 +70,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors("DocVaultCors");
+app.UseAuthentication(); 
 app.UseAuthorization();
 app.MapControllers();
 

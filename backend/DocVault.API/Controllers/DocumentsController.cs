@@ -1,9 +1,12 @@
 using DocVault.API.DTOs;
 using DocVault.API.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+
 
 namespace DocVault.API.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/documents")]
 [Produces("application/json")]

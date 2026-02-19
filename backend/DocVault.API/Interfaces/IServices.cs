@@ -55,12 +55,5 @@ public interface IDocumentService
         string userId,
         CancellationToken ct = default);
 
-    Task<IReadOnlyList<DocumentDto>> GetDocumentsAsync(
-        string userId,
-        CancellationToken ct = default);
-
-    Task<IReadOnlyList<DocumentDto>> SearchDocumentsAsync(
-        string userId,
-        string searchTerm,
-        CancellationToken ct = default);
+    Task<IReadOnlyList<DocumentDto>> GetDocumentsAsync(string userId, CancellationToken ct = default);
 }

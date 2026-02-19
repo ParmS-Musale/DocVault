@@ -1,156 +1,92 @@
-import { Component, inject, signal, OnInit } from "@angular/core";
-import { CommonModule } from "@angular/common";
-import { RouterLink, RouterLinkActive } from "@angular/router";
-import { MatToolbarModule } from "@angular/material/toolbar";
-import { MatButtonModule } from "@angular/material/button";
-import { MatIconModule } from "@angular/material/icon";
+import { Component } from '@angular/core';
+import { RouterLink, RouterLinkActive } from '@angular/router';
+import { MatToolbarModule } from '@angular/material/toolbar';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 
-import { MsalService } from "@azure/msal-angular";
-import { EventMessage, EventType } from "@azure/msal-browser";
-
+/**
+ * Top navigation bar shared across all pages.
+ */
 @Component({
-  selector: "app-nav",
+  selector: 'app-nav',
   standalone: true,
   imports: [
-    CommonModule,
     RouterLink,
     RouterLinkActive,
     MatToolbarModule,
     MatButtonModule,
-    MatIconModule,
+    MatIconModule
   ],
   template: `
-    <mat-toolbar color="primary" class="toolbar">
-
-      <span class="logo" routerLink="/home">
-        <mat-icon>folder</mat-icon>
-        DocVault
-      </span>
-
-      <div class="nav-links">
-        <a mat-button routerLink="/home" routerLinkActive="active">
-          <mat-icon>home</mat-icon>
-          Home
-        </a>
-
-        <a mat-button routerLink="/upload" routerLinkActive="active">
-          <mat-icon>cloud_upload</mat-icon>
-          Upload
-        </a>
-
-        <a mat-button routerLink="/documents" routerLinkActive="active">
-          <mat-icon>folder_open</mat-icon>
-          Documents
-        </a>
+    <mat-toolbar class="nav-toolbar" color="primary">
+      <div class="nav-brand">
+        <mat-icon class="brand-icon">folder_special</mat-icon>
+        <span class="brand-name">DocVault</span>
       </div>
 
-      <span class="spacer"></span>
+      <span class="nav-spacer"></span>
 
-      @if (userName()) {
-        <span class="user">
-          <mat-icon>account_circle</mat-icon>
-          {{ userName() }}
-        </span>
-
-        <button mat-button (click)="logout()">
-          <mat-icon>logout</mat-icon>
-          Logout
-        </button>
-      }
-
+      <nav class="nav-links">
+        <a mat-button routerLink="/" routerLinkActive="active-link"
+           [routerLinkActiveOptions]="{exact: true}">
+          <mat-icon>home</mat-icon>
+          <span>Home</span>
+        </a>
+        <a mat-button routerLink="/upload" routerLinkActive="active-link">
+          <mat-icon>cloud_upload</mat-icon>
+          <span>Upload</span>
+        </a>
+        <a mat-button routerLink="/documents" routerLinkActive="active-link">
+          <mat-icon>folder_open</mat-icon>
+          <span>Documents</span>
+        </a>
+      </nav>
     </mat-toolbar>
   `,
   styles: [`
-    .toolbar {
+    .nav-toolbar {
       position: sticky;
       top: 0;
-      z-index: 1000;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .nav-brand {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 8px;
+      cursor: default;
     }
-
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 600;
-      cursor: pointer;
+    .brand-icon {
+      font-size: 28px;
+      width: 28px;
+      height: 28px;
     }
-
+    .brand-name {
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .nav-spacer { flex: 1; }
     .nav-links {
       display: flex;
-      gap: 6px;
+      gap: 4px;
     }
-
-    .nav-links a.active {
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 6px;
-    }
-
-    .spacer {
-      flex: 1;
-    }
-
-    .user {
+    .nav-links a {
       display: flex;
       align-items: center;
       gap: 6px;
-      margin-right: 8px;
-      font-size: 14px;
+      border-radius: 8px;
+      font-weight: 500;
+      opacity: 0.85;
+      transition: opacity 0.2s, background 0.2s;
     }
+    .nav-links a:hover { opacity: 1; background: rgba(255,255,255,0.1); }
+    .active-link { opacity: 1 !important; background: rgba(255,255,255,0.15) !important; }
 
-    button {
-      color: white;
+    @media (max-width: 600px) {
+      .nav-links a span { display: none; }
+      .brand-name { font-size: 1.1rem; }
     }
-
-    mat-icon {
-      font-size: 20px;
-    }
-
-    @media (max-width: 768px) {
-      .nav-links span {
-        display: none;
-      }
-
-      .user {
-        display: none;
-      }
-    }
-  `],
+  `]
 })
-export class NavComponent implements OnInit {
-  private readonly msalService = inject(MsalService);
-
-  userName = signal<string | null>(null);
-
-  ngOnInit(): void {
-    this.setUser();
-
-    this.msalService.instance.addEventCallback((event: EventMessage) => {
-      if (event.eventType === EventType.LOGIN_SUCCESS) {
-        const payload = event.payload as any;
-        this.msalService.instance.setActiveAccount(payload.account);
-        this.setUser();
-      }
-
-      if (event.eventType === EventType.LOGOUT_SUCCESS) {
-        this.userName.set(null);
-      }
-    });
-  }
-
-  private setUser(): void {
-    const account =
-      this.msalService.instance.getActiveAccount() ??
-      this.msalService.instance.getAllAccounts()[0];
-
-    if (account) {
-      this.userName.set(account.name ?? account.username);
-    }
-  }
-
-  logout(): void {
-    this.msalService.logoutRedirect();
-  }
-}
+export class NavComponent {}

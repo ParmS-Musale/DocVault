@@ -75,6 +75,40 @@ public class DocumentsController : ControllerBase
         }
     }
 
+    // ── GET /api/documents/search?q=term ───────────────────────────────────────
+
+    [HttpGet("search")]
+    [ProducesResponseType(typeof(IReadOnlyList<DocumentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponseDto), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponseDto), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SearchDocuments(
+        [FromQuery(Name = "q")] string? query,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return BadRequest(new ErrorResponseDto("Search query parameter 'q' is required."));
+        }
+
+        // Small guardrail against accidental empty / 1-char searches.
+        if (query.Trim().Length < 2)
+        {
+            return BadRequest(new ErrorResponseDto("Search term must be at least 2 characters long."));
+        }
+
+        try
+        {
+            var userId = GetUserId();
+            var documents = await _documentService.SearchDocumentsAsync(userId, query, ct);
+            return Ok(documents);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error searching documents with query {Query}", query);
+            return StatusCode(500, new ErrorResponseDto("Failed to search documents.", ex.Message));
+        }
+    }
+
     // ── POST /api/documents ────────────────────────────────────────────────────
 
     [HttpPost]
@@ -130,6 +164,29 @@ public class DocumentsController : ControllerBase
 
     private string GetUserId()
     {
-        return "anonymous";
+        // For development/testing without a full token, you might want a fallback,
+        // but for production, we expect a valid claim.
+        
+        // 1. Try to get the "oid" (Object ID) claim standard in Azure AD v2 tokens
+        var oid = User.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value 
+                  ?? User.FindFirst("oid")?.Value;
+
+        if (!string.IsNullOrEmpty(oid))
+            return oid;
+
+        // 2. Fallback to "sub" (Subject) if oid is missing
+        var sub = User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value
+                  ?? User.FindFirst("sub")?.Value;
+
+        if (!string.IsNullOrEmpty(sub))
+            return sub;
+
+        // 3. Fallback to Name if available
+        if (User.Identity?.Name != null)
+            return User.Identity.Name;
+
+        // 4. If strict auth is required, throw. 
+        // For now, if we are in [Authorize], we should have *something*, but if not:
+        throw new UnauthorizedAccessException("User ID claim not found in token.");
     }
 }

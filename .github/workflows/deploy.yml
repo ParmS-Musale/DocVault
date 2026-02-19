@@ -115,7 +115,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     environment:
       name: production
-      url: https://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net
+      # url: https://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net
 
     steps:
       - name: Download API artifact

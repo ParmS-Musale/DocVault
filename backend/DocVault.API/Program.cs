@@ -1,110 +1,90 @@
 using DocVault.API.Configuration;
 using DocVault.API.Interfaces;
 using DocVault.API.Services;
+using Azure.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Services ─────────────────────────────────────────────
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "DocVault API",
-        Version = "v1"
-    });
-
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = "Authorization: Bearer {token}",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
-
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
-    });
-});
-
-// ── Configuration ────────────────────────────────────────
+// ── Configuration ──────────────────────────────────────────────────────────────
 builder.Services.Configure<AzureStorageOptions>(
     builder.Configuration.GetSection(AzureStorageOptions.SectionName));
-
 builder.Services.Configure<CosmosDbOptions>(
     builder.Configuration.GetSection(CosmosDbOptions.SectionName));
 
-builder.Services.Configure<EventGridOptions>(
-    builder.Configuration.GetSection(EventGridOptions.SectionName));
+// ── Key Vault (Production Secrets) ─────────────────────────────────────────────
+var keyVaultName = builder.Configuration["KeyVaultName"];
+if (!string.IsNullOrEmpty(keyVaultName))
+{
+    var keyVaultUri = new Uri($"https://{keyVaultName}.vault.azure.net/");
+    builder.Configuration.AddAzureKeyVault(keyVaultUri, new Azure.Identity.DefaultAzureCredential());
+}
 
-builder.Services.Configure<ServiceBusOptions>(
-    builder.Configuration.GetSection(ServiceBusOptions.SectionName));
+// ── Azure Messaging (Event Grid & Service Bus) ─────────────────────────────────
+var eventGridEndpoint = builder.Configuration["EventGrid:Endpoint"];
+if (!string.IsNullOrEmpty(eventGridEndpoint))
+{
+    builder.Services.AddSingleton(new Azure.Messaging.EventGrid.EventGridPublisherClient(
+        new Uri(eventGridEndpoint),
+        new DefaultAzureCredential()));
+}
 
-// ── Custom Services ──────────────────────────────────────
+var serviceBusNamespace = builder.Configuration["ServiceBus:Namespace"];
+if (!string.IsNullOrEmpty(serviceBusNamespace))
+{
+    builder.Services.AddSingleton(new Azure.Messaging.ServiceBus.ServiceBusClient(
+        serviceBusNamespace,
+        new DefaultAzureCredential()));
+}
+
+// ── Azure Services ─────────────────────────────────────────────────────────────
 builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
 builder.Services.AddSingleton<ICosmosDbService, CosmosDbService>();
 builder.Services.AddScoped<IDocumentService, DocumentService>();
-builder.Services.AddScoped<IEventService, EventService>();
 
-// ── Application Insights ─────────────────────────────────
-var appInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
-if (!string.IsNullOrEmpty(appInsightsConnectionString))
+// ── ASP.NET Core ───────────────────────────────────────────────────────────────
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new() { Title = "DocVault API", Version = "v1" });
+});
+
+if (!string.IsNullOrEmpty(builder.Configuration["ApplicationInsights:ConnectionString"]))
 {
     builder.Services.AddApplicationInsightsTelemetry();
 }
 
-// ── JWT Authentication ───────────────────────────────────
+// ── JWT Authentication (Entra ID) ──────────────────────────────────────────────
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         var azureAd = builder.Configuration.GetSection("AzureAd");
 
-        var tenantId = azureAd["TenantId"];
-        var instance = azureAd["Instance"];
-
-        options.Authority = $"{instance}{tenantId}/v2.0";
+        options.Authority =
+            $"{azureAd["Instance"]}{azureAd["TenantId"]}/v2.0";
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
-            ValidateLifetime = true,
-
-            ValidAudiences = new[]
-            {
-                azureAd["Audience"],
-                azureAd["ClientId"]
-            }
+            ValidAudiences = [azureAd["Audience"], azureAd["ClientId"]],
+            ValidateLifetime = true
         };
     });
 
 builder.Services.AddAuthorization();
 
-// ── CORS ─────────────────────────────────────────────────
+// ── CORS – allow Angular dev server and deployed URL ──────────────────────────
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DocVaultCors", policy =>
     {
         policy.WithOrigins(
                 builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
-                ?? new[] { "http://localhost:4200" })
+                ?? ["http://localhost:4200"])
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
@@ -112,7 +92,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// ── Middleware ───────────────────────────────────────────
+// ── Middleware Pipeline ─────────────────────────────────────────────────────────
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -125,10 +105,8 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseCors("DocVaultCors");
-
-app.UseAuthentication();
+app.UseAuthentication(); 
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();

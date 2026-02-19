@@ -1,6 +1,7 @@
 using DocVault.API.DTOs;
 using DocVault.API.Interfaces;
 using DocVault.API.Models;
+using Microsoft.Extensions.Configuration;
 
 namespace DocVault.API.Services;
 
@@ -10,19 +11,25 @@ public class DocumentService : IDocumentService
 
     private readonly IBlobStorageService _blobStorage;
     private readonly ICosmosDbService _cosmosDb;
-    private readonly IEventService _eventService; // Added
     private readonly ILogger<DocumentService> _logger;
+    private readonly Azure.Messaging.EventGrid.EventGridPublisherClient? _eventGridPublisher;
+    private readonly Azure.Messaging.ServiceBus.ServiceBusClient? _serviceBusClient;
+    private readonly IConfiguration _configuration;
 
     public DocumentService(
         IBlobStorageService blobStorage,
         ICosmosDbService cosmosDb,
-        IEventService eventService, // Added
-        ILogger<DocumentService> logger)
+        ILogger<DocumentService> logger,
+        IConfiguration configuration,
+        Azure.Messaging.EventGrid.EventGridPublisherClient? eventGridPublisher = null,
+        Azure.Messaging.ServiceBus.ServiceBusClient? serviceBusClient = null)
     {
         _blobStorage = blobStorage;
         _cosmosDb = cosmosDb;
-        _eventService = eventService; // Added
         _logger = logger;
+        _configuration = configuration;
+        _eventGridPublisher = eventGridPublisher;
+        _serviceBusClient = serviceBusClient;
     }
 
     public async Task<UploadResponseDto> UploadDocumentAsync(
@@ -44,13 +51,8 @@ public class DocumentService : IDocumentService
             fileName, fileSize, userId);
 
         // 1️⃣ Upload to Blob Storage
-        var metadata = new Dictionary<string, string>
-        {
-            { "userId", userId }
-        };
-
         var (blobName, blobUrl) = await _blobStorage.UploadAsync(
-            fileStream, fileName, contentType, metadata, ct);
+            fileStream, fileName, contentType, ct);
 
         // 2️⃣ Create Cosmos metadata record
         var record = new DocumentRecord
@@ -80,10 +82,77 @@ public class DocumentService : IDocumentService
             throw;
         }
 
-        // 3️⃣ Generate SAS URL
-        var sasUrl = await _blobStorage.GenerateSasUrlAsync(blobName, SasValidityPeriod, ct);
+        // 3️⃣ Event Grid Notification
+        if (_eventGridPublisher != null)
+        {
+            try
+            {
+                var evt = new Azure.Messaging.EventGrid.EventGridEvent(
+                    subject: $"docs/uploaded/{userId}/{record.Id}",
+                    eventType: "DocVault.DocumentUploaded",
+                    dataVersion: "1.0",
+                    data: new
+                    {
+                        record.Id,
+                        record.FileName,
+                        record.UserId
+                    });
 
-        var responseDto = new UploadResponseDto(
+                await _eventGridPublisher.SendEventAsync(evt, ct);
+
+                _logger.LogInformation(
+                    "Published DocumentUploaded event to Event Grid.");
+            }
+            catch (Exception ex)
+            {
+                // Non-blocking failure
+                _logger.LogError(ex,
+                    "Failed to publish Event Grid event.");
+            }
+        }
+
+        // 4️⃣ Service Bus - Heavy Processing
+        if (_serviceBusClient != null &&
+            (fileSize > 10 * 1024 * 1024 ||
+             contentType == "application/pdf"))
+        {
+            try
+            {
+                var queueName =
+                    _configuration["ServiceBus:QueueName"]
+                    ?? "document-processing";
+
+                var sender =
+                    _serviceBusClient.CreateSender(queueName);
+
+                var payload = System.Text.Json.JsonSerializer.Serialize(
+                    new
+                    {
+                        record.Id,
+                        record.UserId,
+                        record.BlobName
+                    });
+
+                var message =
+                    new Azure.Messaging.ServiceBus.ServiceBusMessage(payload);
+
+                await sender.SendMessageAsync(message, ct);
+
+                _logger.LogInformation(
+                    "Sent message to Service Bus queue.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Failed to send Service Bus message.");
+            }
+        }
+
+        // 5️⃣ Generate SAS URL
+        var sasUrl =
+            _blobStorage.GenerateSasUrl(blobName, SasValidityPeriod);
+
+        return new UploadResponseDto(
             Id: record.Id,
             FileName: record.FileName,
             FileSize: record.FileSize,
@@ -92,28 +161,6 @@ public class DocumentService : IDocumentService
             DownloadUrl: sasUrl,
             Message: "File uploaded successfully."
         );
-
-        // 4️⃣ Publish Event
-        try
-        {
-            // Re-map to DocumentDto for the event payload
-            var docDto = new DocumentDto(
-                record.Id, 
-                record.FileName, 
-                record.FileSize, 
-                record.ContentType, 
-                record.UploadDate, 
-                sasUrl);
-
-            await _eventService.PublishDocumentUploadedAsync(docDto, ct);
-        }
-        catch (Exception ex)
-        {
-            // Don't fail the request if event publishing fails, just log it.
-            _logger.LogError(ex, "Failed to publish upload event for {DocId}", record.Id);
-        }
-
-        return responseDto;
     }
 
     public async Task<IReadOnlyList<DocumentDto>> GetDocumentsAsync(
@@ -123,24 +170,10 @@ public class DocumentService : IDocumentService
         if (string.IsNullOrWhiteSpace(userId))
             throw new ArgumentException("UserId is required.");
 
-        var records = await _cosmosDb.GetDocumentsByUserAsync(userId, ct);
+        var records =
+            await _cosmosDb.GetDocumentsByUserAsync(userId, ct);
 
-        var tasks = records.Select(async r =>
-        {
-            var sasUrl = await _blobStorage.GenerateSasUrlAsync(r.BlobName, SasValidityPeriod, ct);
-            return new DocumentDto(
-                Id: r.Id,
-                FileName: r.FileName,
-                FileSize: r.FileSize,
-                ContentType: r.ContentType,
-                UploadDate: r.UploadDate,
-                DownloadUrl: sasUrl
-            );
-        });
-
-        var dtos = await Task.WhenAll(tasks);
-
-        return dtos.AsReadOnly();
+        return MapRecords(records);   // ✅ FIXED
     }
 
     public async Task<IReadOnlyList<DocumentDto>> SearchDocumentsAsync(
@@ -151,26 +184,39 @@ public class DocumentService : IDocumentService
         if (string.IsNullOrWhiteSpace(userId))
             throw new ArgumentException("UserId is required.");
 
-        if (string.IsNullOrWhiteSpace(searchTerm))
-            throw new ArgumentException("Search term is required.");
+        var records =
+            await _cosmosDb.GetDocumentsByUserAsync(userId, ct);
 
-        var records = await _cosmosDb.SearchDocumentsAsync(userId, searchTerm, ct);
+        var matches = records.Where(r =>
+            (r.FileName?.Contains(searchTerm,
+                StringComparison.OrdinalIgnoreCase) ?? false)
+            ||
+            (r.ExtractedText?.Contains(searchTerm,
+                StringComparison.OrdinalIgnoreCase) ?? false)
+        ).ToList();
 
-        var tasks = records.Select(async r =>
-        {
-            var sasUrl = await _blobStorage.GenerateSasUrlAsync(r.BlobName, SasValidityPeriod, ct);
-            return new DocumentDto(
+        return MapRecords(matches);
+    }
+
+    private IReadOnlyList<DocumentDto> MapRecords(
+        IEnumerable<DocumentRecord> records)
+    {
+        return records
+            .Select(r => new DocumentDto(
                 Id: r.Id,
                 FileName: r.FileName,
                 FileSize: r.FileSize,
                 ContentType: r.ContentType,
                 UploadDate: r.UploadDate,
-                DownloadUrl: sasUrl
-            );
-        });
-
-        var dtos = await Task.WhenAll(tasks);
-
-        return dtos.AsReadOnly();
+                DownloadUrl: _blobStorage.GenerateSasUrl(
+                    r.BlobName, SasValidityPeriod),
+                ThumbnailUrl: r.ThumbnailUrl,
+                IsProcessed: r.IsProcessed,
+                Snippet: r.ExtractedText?.Length > 100
+                    ? r.ExtractedText[..100] + "..."
+                    : r.ExtractedText
+            ))
+            .ToList()
+            .AsReadOnly();
     }
 }

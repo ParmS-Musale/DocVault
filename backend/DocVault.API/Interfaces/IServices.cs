@@ -15,13 +15,11 @@ public interface IBlobStorageService
         Stream fileStream,
         string fileName,
         string contentType,
-        IDictionary<string, string>? metadata = null,
         CancellationToken ct = default);
 
     // Generates a time-limited SAS download URL for the given blob.
   
-    // Generates a time-limited SAS download URL for the given blob.
-    Task<string> GenerateSasUrlAsync(string blobName, TimeSpan validFor, CancellationToken ct = default);
+    string GenerateSasUrl(string blobName, TimeSpan validFor);
 
 
   // Deletes a blob permanently from storage.
@@ -42,9 +40,6 @@ public interface ICosmosDbService
 
     // Deletes a document record from Cosmos DB.
     Task DeleteDocumentAsync(string id, string userId, CancellationToken ct = default);
-
-    // Performs a case-insensitive search over a user's documents.
-    Task<IReadOnlyList<DocumentRecord>> SearchDocumentsAsync(string userId, string searchTerm, CancellationToken ct = default);
 }
 
  
@@ -60,13 +55,12 @@ public interface IDocumentService
         string userId,
         CancellationToken ct = default);
 
-    Task<IReadOnlyList<DocumentDto>> GetDocumentsAsync(string userId, CancellationToken ct = default);
+    Task<IReadOnlyList<DocumentDto>> GetDocumentsAsync(
+        string userId,
+        CancellationToken ct = default);
 
-    Task<IReadOnlyList<DocumentDto>> SearchDocumentsAsync(string userId, string searchTerm, CancellationToken ct = default);
-}
-
-// Abstraction for publishing events (Event Grid / Service Bus).
-public interface IEventService
-{
-    Task PublishDocumentUploadedAsync(DocumentDto document, CancellationToken ct = default);
+    Task<IReadOnlyList<DocumentDto>> SearchDocumentsAsync(
+        string userId,
+        string searchTerm,
+        CancellationToken ct = default);
 }

@@ -102,6 +102,9 @@ jobs:
 
     env:
       API_BASE_URL: ${{ secrets.ANGULAR_API_BASE_URL }}
+    environment:
+      name: production
+      # url: https://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net
 
     steps:
       - name: Download API artifact

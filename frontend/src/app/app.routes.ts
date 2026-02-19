@@ -1,38 +1,23 @@
-import { Routes } from "@angular/router";
-import { MsalGuard } from "@azure/msal-angular";
+import { Routes } from '@angular/router';
 
 export const routes: Routes = [
   {
-    path: "",
-    redirectTo: "home",
-    pathMatch: "full",
-  },
-  {
-    path: "home",
-    canActivate: [MsalGuard],
+    path: '',
     loadComponent: () =>
-      import("./components/home/home.component").then(
-        (m) => m.HomeComponent
-      ),
+      import('./components/home/home.component').then(m => m.HomeComponent)
   },
   {
-    path: "upload",
-    canActivate: [MsalGuard],
+    path: 'upload',
     loadComponent: () =>
-      import("./components/upload/upload.component").then(
-        (m) => m.UploadComponent
-      ),
+      import('./components/upload/upload.component').then(m => m.UploadComponent)
   },
   {
-    path: "documents",
-    canActivate: [MsalGuard],
+    path: 'documents',
     loadComponent: () =>
-      import("./components/document-list/document-list.component").then(
-        (m) => m.DocumentListComponent
-      ),
+      import('./components/document-list/document-list.component').then(m => m.DocumentListComponent)
   },
   {
-    path: "**",
-    redirectTo: "home",
-  },
+    path: '**',
+    redirectTo: ''
+  }
 ];

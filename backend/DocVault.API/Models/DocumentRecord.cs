@@ -45,13 +45,4 @@ public class DocumentRecord
     /// </summary>
     [JsonProperty("userId")]
     public string UserId { get; set; } = "anonymous";
-
-    [JsonProperty("thumbnailUrl")]
-    public string? ThumbnailUrl { get; set; }
-
-    [JsonProperty("isProcessed")]
-    public bool IsProcessed { get; set; }
-
-    [JsonProperty("extractedText")]
-    public string? ExtractedText { get; set; }
 }

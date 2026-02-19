@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  docvault-api:
+    build:
+      context: .
+      dockerfile: backend/DocVault.API/Dockerfile
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - AzureStorage__ConnectionString=${AZURE_STORAGE_CONNECTION_STRING}
+      - AzureStorage__ContainerName=docvault-files
+      - CosmosDb__ConnectionString=${COSMOS_DB_CONNECTION_STRING}
+      - CosmosDb__DatabaseName=DocVaultDB
+      - CosmosDb__ContainerName=Documents
+      - AzureAd__Instance=https://login.microsoftonline.com/
+      - AzureAd__TenantId=${AZURE_AD_TENANT_ID}
+      - AzureAd__ClientId=${AZURE_AD_CLIENT_ID}
+      - AzureAd__Audience=api://${AZURE_AD_CLIENT_ID}
+      - AllowedOrigins__0=http://localhost
+    restart: always
+
+  docvault-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - docvault-api
+    restart: always

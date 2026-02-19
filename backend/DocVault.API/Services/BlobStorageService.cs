@@ -1,3 +1,4 @@
+using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
@@ -9,24 +10,39 @@ namespace DocVault.API.Services;
 
 public class BlobStorageService : IBlobStorageService
 {
+    private readonly BlobServiceClient _serviceClient;
     private readonly BlobContainerClient _containerClient;
     private readonly ILogger<BlobStorageService> _logger;
 
     private bool _containerEnsured;
 
     public BlobStorageService(
-    IOptions<AzureStorageOptions> options,
-    ILogger<BlobStorageService> logger)
-{
-    _logger = logger;
-    var opts = options.Value;
+        IOptions<AzureStorageOptions> options,
+        ILogger<BlobStorageService> logger)
+    {
+        _logger = logger;
+        var opts = options.Value;
 
-    _logger.LogInformation("Azure ConnectionString = {cs}", opts.ConnectionString);
-    _logger.LogInformation("Azure ContainerName = {container}", opts.ContainerName);
+        if (string.IsNullOrWhiteSpace(opts.ConnectionString))
+        {
+            throw new ArgumentException("AzureStorage:ConnectionString is required.");
+        }
 
-    var serviceClient = new BlobServiceClient(opts.ConnectionString);
-    _containerClient = serviceClient.GetBlobContainerClient(opts.ContainerName);
-}
+        // Check if connection string is actually a URI (indicating Managed Identity usage)
+        if (Uri.TryCreate(opts.ConnectionString, UriKind.Absolute, out var uri) && 
+           (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+        {
+             _logger.LogInformation("Using Managed Identity (DefaultAzureCredential) with endpoint: {Endpoint}", opts.ConnectionString);
+             _serviceClient = new BlobServiceClient(uri, new DefaultAzureCredential());
+        }
+        else
+        {
+             _logger.LogInformation("Using Connection String for Blob Storage.");
+             _serviceClient = new BlobServiceClient(opts.ConnectionString);
+        }
+
+        _containerClient = _serviceClient.GetBlobContainerClient(opts.ContainerName);
+    }
 
     private async Task EnsureContainerExistsAsync(CancellationToken ct = default)
     {
@@ -39,6 +55,7 @@ public class BlobStorageService : IBlobStorageService
         Stream fileStream,
         string fileName,
         string contentType,
+        IDictionary<string, string>? metadata = null,
         CancellationToken ct = default)
     {
         await EnsureContainerExistsAsync(ct);
@@ -54,7 +71,8 @@ public class BlobStorageService : IBlobStorageService
             HttpHeaders = new BlobHttpHeaders
             {
                 ContentType = contentType
-            }
+            },
+            Metadata = metadata
         };
 
         // Reset stream if seekable
@@ -71,30 +89,89 @@ public class BlobStorageService : IBlobStorageService
         return (blobName, blobClient.Uri.ToString());
     }
 
-    public string GenerateSasUrl(string blobName, TimeSpan validFor)
+    private UserDelegationKey? _cachedUserDelegationKey;
+    private readonly SemaphoreSlim _keyLock = new(1, 1);
+
+    public async Task<string> GenerateSasUrlAsync(string blobName, TimeSpan validFor, CancellationToken ct = default)
     {
         var blobClient = _containerClient.GetBlobClient(blobName);
 
-        if (!blobClient.CanGenerateSasUri)
+        // Check if we can generate SAS directly (e.g. Account Key auth)
+        if (blobClient.CanGenerateSasUri)
         {
-            _logger.LogWarning(
-                "Cannot generate SAS URI for blob {BlobName}. Returning plain URL.",
-                blobName);
+            var sasBuilder = new BlobSasBuilder
+            {
+                BlobContainerName = _containerClient.Name,
+                BlobName = blobName,
+                Resource = "b",
+                ExpiresOn = DateTimeOffset.UtcNow.Add(validFor)
+            };
 
-            return blobClient.Uri.ToString();
+            sasBuilder.SetPermissions(BlobSasPermissions.Read);
+
+            return blobClient.GenerateSasUri(sasBuilder).ToString();
         }
 
-        var sasBuilder = new BlobSasBuilder
+        // Fallback to User Delegation SAS (Managed Identity)
+        try 
         {
-            BlobContainerName = _containerClient.Name,
-            BlobName = blobName,
-            Resource = "b",
-            ExpiresOn = DateTimeOffset.UtcNow.Add(validFor)
-        };
+            var key = await GetUserDelegationKeyAsync(ct);
 
-        sasBuilder.SetPermissions(BlobSasPermissions.Read);
+            var sasBuilder = new BlobSasBuilder
+            {
+                BlobContainerName = _containerClient.Name,
+                BlobName = blobName,
+                Resource = "b",
+                StartsOn = DateTimeOffset.UtcNow.AddMinutes(-5), // Allow for clock skew
+                ExpiresOn = DateTimeOffset.UtcNow.Add(validFor)
+            };
 
-        return blobClient.GenerateSasUri(sasBuilder).ToString();
+            sasBuilder.SetPermissions(BlobSasPermissions.Read);
+            
+            var sasQueryParameters = sasBuilder.ToSasQueryParameters(key, _serviceClient.AccountName);
+
+            var fullUri = new UriBuilder(blobClient.Uri)
+            {
+                Query = sasQueryParameters.ToString()
+            };
+
+            return fullUri.ToString();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to generate User Delegation SAS for blob {BlobName}", blobName);
+            // Fallback to plain URL if SAS generation fails
+             return blobClient.Uri.ToString();
+        }
+    }
+
+    private async Task<UserDelegationKey> GetUserDelegationKeyAsync(CancellationToken ct)
+    {
+        // Double-check locking for thread safety
+        if (_cachedUserDelegationKey != null && _cachedUserDelegationKey.SignedExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5))
+        {
+            return _cachedUserDelegationKey;
+        }
+
+        await _keyLock.WaitAsync(ct);
+        try
+        {
+            if (_cachedUserDelegationKey != null && _cachedUserDelegationKey.SignedExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5))
+            {
+                return _cachedUserDelegationKey;
+            }
+
+            // Key valid for 1 hour
+            var keyStart = DateTimeOffset.UtcNow.AddMinutes(-5);
+            var keyEnd = DateTimeOffset.UtcNow.AddHours(1);
+            
+            _cachedUserDelegationKey = await _serviceClient.GetUserDelegationKeyAsync(keyStart, keyEnd, ct);
+            return _cachedUserDelegationKey;
+        }
+        finally
+        {
+            _keyLock.Release();
+        }
     }
 
     public async Task DeleteAsync(string blobName, CancellationToken ct = default)

@@ -162,4 +162,49 @@ public class CosmosDbService : ICosmosDbService
             throw;
         }
     }
+
+    public async Task<IReadOnlyList<DocumentRecord>> SearchDocumentsAsync(
+        string userId,
+        string searchTerm,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("UserId is required.");
+
+        if (string.IsNullOrWhiteSpace(searchTerm))
+            throw new ArgumentException("Search term is required.");
+
+        var term = searchTerm.Trim().ToLowerInvariant();
+
+        _logger.LogInformation(
+            "Searching documents for user {UserId} with term {Term}",
+            userId,
+            term);
+
+        var queryable = _container
+            .GetItemLinqQueryable<DocumentRecord>(
+                requestOptions: new QueryRequestOptions
+                {
+                    PartitionKey = new PartitionKey(userId)
+                })
+            .Where(d => d.UserId == userId);
+
+        // Cosmos LINQ supports string.Contains; normalize client-side for case-insensitive match.
+        var query = queryable
+            .Where(d =>
+                d.FileName.ToLower().Contains(term) ||
+                d.ContentType.ToLower().Contains(term))
+            .OrderByDescending(d => d.UploadDate)
+            .ToFeedIterator();
+
+        var results = new List<DocumentRecord>();
+
+        while (query.HasMoreResults)
+        {
+            var batch = await query.ReadNextAsync(ct);
+            results.AddRange(batch);
+        }
+
+        return results.AsReadOnly();
+    }
 }

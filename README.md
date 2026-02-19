@@ -315,6 +315,32 @@ Body: file=<binary>
 }
 ```
 
+##  Security & Secret Management
+
+DocVault follows Azure-recommended security practices for managing secrets and identity.
+
+### Secrets
+- All sensitive values (Azure Storage and Cosmos DB connection strings) are stored in **Azure Key Vault**
+- No secrets are committed to the repository
+- `appsettings.json` and `appsettings.Development.json` contain only non-sensitive configuration
+
+### Identity & Access
+- The backend API runs on **Azure App Service** with **System-Assigned Managed Identity**
+- The Managed Identity is granted **Key Vault Secrets User** role on the Key Vault
+- The application accesses Key Vault using `DefaultAzureCredential`
+
+### Configuration Flow
+1. Application starts
+2. `DefaultAzureCredential` authenticates (Managed Identity in Azure, Azure login locally)
+3. Configuration is loaded from Azure Key Vault
+4. Secrets are resolved automatically via configuration keys
+
+This ensures:
+- No credentials in code or config files
+- Least-privilege access
+- Same code path for local and cloud environments
+
+
 ---
 
 ## CI/CD Deployment
@@ -357,3 +383,4 @@ Body: file=<binary>
 
 Archived blobs require rehydration before download (~1–15 hours).
 Adjust thresholds in `setup-azure.sh` to match your retention needs.
+

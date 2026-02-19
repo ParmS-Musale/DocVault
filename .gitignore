@@ -48,3 +48,8 @@ appsettings.Development.json
 .env
 .env.local
 .env.production
+#---secret keys
+**/appsettings.Development.json
+publish.zip
+=======
+>>>>>> main

@@ -1,0 +1,29 @@
+{
+  "rules": [
+    {
+      "enabled": true,
+      "name": "MoveToCoolAndArchive",
+      "type": "Lifecycle",
+      "definition": {
+        "actions": {
+          "baseBlob": {
+            "tierToCool": {
+              "daysAfterModificationGreaterThan": 30
+            },
+            "tierToArchive": {
+              "daysAfterModificationGreaterThan": 180
+            }
+          }
+        },
+        "filters": {
+          "blobTypes": [
+            "blockBlob"
+          ],
+          "prefixMatch": [
+            "uploads/"
+          ]
+        }
+      }
+    }
+  ]
+}

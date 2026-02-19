@@ -1,6 +1,7 @@
 using DocVault.API.Configuration;
 using DocVault.API.Interfaces;
 using DocVault.API.Services;
+using Azure.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -12,6 +13,31 @@ builder.Services.Configure<AzureStorageOptions>(
     builder.Configuration.GetSection(AzureStorageOptions.SectionName));
 builder.Services.Configure<CosmosDbOptions>(
     builder.Configuration.GetSection(CosmosDbOptions.SectionName));
+
+// ── Key Vault (Production Secrets) ─────────────────────────────────────────────
+var keyVaultName = builder.Configuration["KeyVaultName"];
+if (!string.IsNullOrEmpty(keyVaultName))
+{
+    var keyVaultUri = new Uri($"https://{keyVaultName}.vault.azure.net/");
+    builder.Configuration.AddAzureKeyVault(keyVaultUri, new Azure.Identity.DefaultAzureCredential());
+}
+
+// ── Azure Messaging (Event Grid & Service Bus) ─────────────────────────────────
+var eventGridEndpoint = builder.Configuration["EventGrid:Endpoint"];
+if (!string.IsNullOrEmpty(eventGridEndpoint))
+{
+    builder.Services.AddSingleton(new Azure.Messaging.EventGrid.EventGridPublisherClient(
+        new Uri(eventGridEndpoint),
+        new DefaultAzureCredential()));
+}
+
+var serviceBusNamespace = builder.Configuration["ServiceBus:Namespace"];
+if (!string.IsNullOrEmpty(serviceBusNamespace))
+{
+    builder.Services.AddSingleton(new Azure.Messaging.ServiceBus.ServiceBusClient(
+        serviceBusNamespace,
+        new DefaultAzureCredential()));
+}
 
 // ── Azure Services ─────────────────────────────────────────────────────────────
 builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
@@ -26,6 +52,11 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new() { Title = "DocVault API", Version = "v1" });
 });
 
+if (!string.IsNullOrEmpty(builder.Configuration["ApplicationInsights:ConnectionString"]))
+{
+    builder.Services.AddApplicationInsightsTelemetry();
+}
+
 // ── JWT Authentication (Entra ID) ──────────────────────────────────────────────
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -39,7 +70,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             ValidateIssuer = true,
             ValidateAudience = true,
-            ValidAudience = azureAd["Audience"],
+            ValidAudiences = [azureAd["Audience"], azureAd["ClientId"]],
             ValidateLifetime = true
         };
     });
@@ -78,3 +109,4 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
+app.Run();

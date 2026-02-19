@@ -9,7 +9,10 @@ public record DocumentDto(
     long FileSize,
     string ContentType,
     DateTime UploadDate,
-    string DownloadUrl   // Blob SAS URL valid for 1 hour
+    string DownloadUrl,
+    string? ThumbnailUrl = null,
+    bool IsProcessed = false,
+    string? Snippet = null
 );
 
 // Response returned from POST /api/documents after a successful upload.

@@ -44,6 +44,7 @@ public class DocumentsController : ControllerBase
     // ── GET /api/documents/health ───────────────────────────────────────────────
 
     [HttpGet("health")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(HealthDto), StatusCodes.Status200OK)]
     public IActionResult Health()
     {
@@ -126,10 +127,42 @@ public class DocumentsController : ControllerBase
         }
     }
 
+    // ── GET /api/documents/search ──────────────────────────────────────────────
+
+    [HttpGet("search")]
+    [ProducesResponseType(typeof(IReadOnlyList<DocumentDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SearchDocuments([FromQuery] string q, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+            return BadRequest(new ErrorResponseDto("Search term cannot be empty."));
+
+        try
+        {
+            var userId = GetUserId();
+            var results = await _documentService.SearchDocumentsAsync(userId, q, ct);
+            return Ok(results);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error searching documents");
+            return StatusCode(500, new ErrorResponseDto("Failed to search documents.", ex.Message));
+        }
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private string GetUserId()
     {
-        return "anonymous";
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                     ?? User.FindFirst("sub")?.Value
+                     ?? User.FindFirst("oid")?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            _logger.LogWarning("User ID claim not found in token.");
+            throw new UnauthorizedAccessException("User ID not found in token.");
+        }
+
+        return userId;
     }
 }

@@ -363,17 +363,25 @@ export class DocumentListComponent implements OnInit {
   }
 
   applyFilter(): void {
-    const term = this.searchTerm.trim().toLowerCase();
-    if (!term) {
+    const raw = this.searchTerm.trim();
+
+    if (!raw) {
       this.filteredDocuments.set(this.documents());
-    } else {
-      this.filteredDocuments.set(
-        this.documents().filter(d =>
-          d.fileName.toLowerCase().includes(term) ||
-          d.contentType.toLowerCase().includes(term)
-        )
-      );
+      return;
     }
+
+    // Delegate filtering to the backend search endpoint for better scalability.
+    this.loading.set(true);
+    this.docService.searchDocuments(raw).subscribe({
+      next: docs => {
+        this.filteredDocuments.set(docs);
+        this.loading.set(false);
+      },
+      error: err => {
+        this.error.set(err?.error?.error ?? 'Unable to search documents.');
+        this.loading.set(false);
+      }
+    });
   }
 
   sortData(sort: Sort): void {

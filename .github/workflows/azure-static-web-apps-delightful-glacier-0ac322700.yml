@@ -30,7 +30,7 @@ jobs:
 
           app_location: "./frontend"
           api_location: ""
-          output_location: "dist/docvault-frontend"
+          output_location: "dist/docvault-frontend/browser"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
@@ -43,3 +43,4 @@ jobs:
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DELIGHTFUL_GLACIER_0AC322700 }}
           action: "close"
+

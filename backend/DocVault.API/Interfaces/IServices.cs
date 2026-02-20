@@ -32,8 +32,11 @@ public interface ICosmosDbService
     //Creates a document record in Cosmos DB.
     Task<DocumentRecord> CreateDocumentAsync(DocumentRecord document, CancellationToken ct = default);
 
-    //Retrieves all documents for a given user.
+    // Retrieves all documents for a given user.
     Task<IReadOnlyList<DocumentRecord>> GetDocumentsByUserAsync(string userId, CancellationToken ct = default);
+
+    // Search documents by keyword (case-insensitive) for a given user.
+    Task<IReadOnlyList<DocumentRecord>> SearchDocumentsAsync(string userId, string keyword, CancellationToken ct = default);
 
     // Retrieves a single document by its ID and partition key.
     Task<DocumentRecord?> GetDocumentAsync(string id, string userId, CancellationToken ct = default);
@@ -56,4 +59,8 @@ public interface IDocumentService
         CancellationToken ct = default);
 
     Task<IReadOnlyList<DocumentDto>> GetDocumentsAsync(string userId, CancellationToken ct = default);
+
+    Task<IReadOnlyList<DocumentDto>> SearchDocumentsAsync(string userId, string keyword, CancellationToken ct = default);
+
+    Task DeleteDocumentAsync(string id, string userId, CancellationToken ct = default);
 }

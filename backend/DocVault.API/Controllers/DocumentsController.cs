@@ -43,15 +43,12 @@ public class DocumentsController : ControllerBase
 
     // ── GET /api/documents/health ───────────────────────────────────────────────
 
+    [AllowAnonymous]
     [HttpGet("health")]
-    [ProducesResponseType(typeof(HealthDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
     public IActionResult Health()
     {
-        return Ok(new HealthDto(
-            Status: "Healthy",
-            Timestamp: DateTime.UtcNow,
-            Version: "1.0.0"
-        ));
+        return Ok("Controller is alive");
     }
 
     // ── GET /api/documents ─────────────────────────────────────────────────────
@@ -126,10 +123,82 @@ public class DocumentsController : ControllerBase
         }
     }
 
+    // ── GET /api/documents/search ──────────────────────────────────────────────
+
+    [HttpGet("search")]
+    [ProducesResponseType(typeof(IReadOnlyList<DocumentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponseDto), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SearchDocuments(
+        [FromQuery] string q,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+            return BadRequest(new ErrorResponseDto("Search query 'q' is required."));
+
+        try
+        {
+            var userId = GetUserId();
+            var documents = await _documentService.SearchDocumentsAsync(userId, q, ct);
+            return Ok(documents);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error searching documents");
+            return StatusCode(500, new ErrorResponseDto("Failed to search documents.", ex.Message));
+        }
+    }
+
+    // ── DELETE /api/documents/{id} ─────────────────────────────────────────────
+
+    [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponseDto), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponseDto), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> DeleteDocument(string id, CancellationToken ct)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest(new ErrorResponseDto("Document ID is required."));
+
+            id = id.Trim();
+            
+            var userId = GetUserId();
+            await _documentService.DeleteDocumentAsync(id, userId, ct);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new ErrorResponseDto("Document not found.", ex.Message));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting document {DocumentId}", id);
+            return StatusCode(500, new ErrorResponseDto("Failed to delete document.", ex.Message));
+        }
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private string GetUserId()
     {
-        return "anonymous";
+        // Debug: Log all claims to help diagnose 404 issues
+        foreach (var claim in User.Claims)
+        {
+            _logger.LogInformation("Claim: {Type} = {Value}", claim.Type, claim.Value);
+        }
+
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+                     ?? User.FindFirst("sub")?.Value 
+                     ?? User.FindFirst("oid")?.Value;
+
+        _logger.LogInformation("Resolved UserId: {UserId}", userId);
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            throw new UnauthorizedAccessException("User ID not found in token."); 
+        }
+
+        return userId;
     }
 }

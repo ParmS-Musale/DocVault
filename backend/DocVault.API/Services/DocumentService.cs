@@ -107,4 +107,57 @@ public class DocumentService : IDocumentService
             .ToList()
             .AsReadOnly();
     }
+    public async Task<IReadOnlyList<DocumentDto>> SearchDocumentsAsync(
+        string userId,
+        string keyword,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("UserId is required.");
+
+        var records = await _cosmosDb.SearchDocumentsAsync(userId, keyword, ct);
+
+        return records
+            .Select(r => new DocumentDto(
+                Id: r.Id,
+                FileName: r.FileName,
+                FileSize: r.FileSize,
+                ContentType: r.ContentType,
+                UploadDate: r.UploadDate,
+                DownloadUrl: _blobStorage.GenerateSasUrl(r.BlobName, SasValidityPeriod)
+            ))
+            .ToList()
+            .AsReadOnly();
+    }
+
+    public async Task DeleteDocumentAsync(
+        string id,
+        string userId,
+        CancellationToken ct = default)
+    {
+         if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("UserId is required.");
+
+        var doc = await _cosmosDb.GetDocumentAsync(id, userId, ct);
+        if (doc == null)
+        {
+            throw new KeyNotFoundException($"Document {id} not found.");
+        }
+
+        if (!string.IsNullOrEmpty(doc.BlobName))
+        {
+            try 
+            {
+                await _blobStorage.DeleteAsync(doc.BlobName, ct);
+            }
+            catch (Exception ex)
+            {
+                 // Log but don't stop DB deletion if blob is already gone or other issue
+                 _logger.LogWarning(ex, "Failed to delete blob {BlobName}, proceeding to delete DB record.", doc.BlobName);
+            }
+        }
+
+        await _cosmosDb.DeleteDocumentAsync(id, doc.UserId, ct);
+        _logger.LogInformation("Document {DocumentId} deleted successfully from partition {PartitionKey}.", id, doc.UserId);
+    }
 }

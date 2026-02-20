@@ -117,21 +117,28 @@ public class CosmosDbService : ICosmosDbService
 
         try
         {
-            var response = await _container.ReadItemAsync<DocumentRecord>(
-                id,
-                new PartitionKey(userId),
-                cancellationToken: ct);
+            // Use Query instead of Point Read for robustness matching typical query behavior
+            var queryDef = new QueryDefinition("SELECT * FROM c WHERE c.id = @id")
+                .WithParameter("@id", id);
+                
+            var iterator = _container.GetItemQueryIterator<DocumentRecord>(
+                queryDef,
+                requestOptions: new QueryRequestOptions 
+                { 
+                    PartitionKey = new PartitionKey(userId) 
+                });
 
-            return response.Resource;
-        }
-        catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-        {
-            _logger.LogWarning(
-                "Cosmos document {DocId} not found for user {UserId}",
-                id,
-                userId);
-
+            if (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync(ct);
+                return response.FirstOrDefault();
+            }
             return null;
+        }
+        catch (CosmosException ex)
+        {
+            _logger.LogError(ex, "Error querying document {DocId} for user {UserId}", id, userId);
+            throw;
         }
     }
 
@@ -161,5 +168,40 @@ public class CosmosDbService : ICosmosDbService
                 "Failed to delete Cosmos document {DocId}", id);
             throw;
         }
+    }
+    public async Task<IReadOnlyList<DocumentRecord>> SearchDocumentsAsync(
+        string userId,
+        string keyword,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("UserId is required.");
+
+        if (string.IsNullOrWhiteSpace(keyword))
+            return new List<DocumentRecord>();
+
+        _logger.LogInformation("Searching documents for user {UserId} with keyword '{Keyword}'", userId, keyword);
+
+        var queryDefinition = new QueryDefinition(
+            "SELECT * FROM c WHERE c.userId = @userId AND CONTAINS(c.fileName, @keyword, true)")
+            .WithParameter("@userId", userId)
+            .WithParameter("@keyword", keyword);
+
+        var query = _container.GetItemQueryIterator<DocumentRecord>(
+            queryDefinition,
+            requestOptions: new QueryRequestOptions
+            {
+                PartitionKey = new PartitionKey(userId)
+            });
+
+        var results = new List<DocumentRecord>();
+
+        while (query.HasMoreResults)
+        {
+            var batch = await query.ReadNextAsync(ct);
+            results.AddRange(batch);
+        }
+
+        return results.AsReadOnly();
     }
 }

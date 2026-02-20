@@ -1,11 +1,13 @@
 import { Component } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
+import { environment } from '../../../environments/environment';
 
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
+
 
 @Component({
   selector: 'app-upload',
@@ -36,7 +38,11 @@ export class UploadComponent {
 
     this.isUploading = true;
 
-    this.http.post('http://localhost:5055/api/documents/upload', formData).subscribe({
+    // Route upload request through Azure API Management (APIM) gateway
+    this.http.post(
+      `${environment.apiBaseUrl}/documents/upload`,
+      formData
+    ).subscribe({
       next: (res) => {
         this.uploadResponse = res;
         this.isUploading = false;

@@ -17,8 +17,8 @@ export function msalInstanceFactory() {
     auth: {
       clientId: ANGULAR_CLIENT_ID,
       authority: `https://login.microsoftonline.com/${TENANT_ID}`,
-      redirectUri: "http://localhost:4200",
-      postLogoutRedirectUri: "http://localhost:4200",
+      redirectUri: "https://happy-bay-0da833d00.2.azurestaticapps.net",
+      postLogoutRedirectUri: "https://happy-bay-0da833d00.2.azurestaticapps.net", 
     },
     cache: {
       cacheLocation: BrowserCacheLocation.LocalStorage,

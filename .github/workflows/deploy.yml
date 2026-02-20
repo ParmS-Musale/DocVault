@@ -124,16 +124,16 @@ jobs:
           echo "Waiting 40s for API to warm up..."
           sleep 40
 
-          URL="http://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net/api/documents/health"
+          URL="${{ secrets.AZURE_WEBAPP_URL }}/api/documents/health"
 
           echo "Checking API health at: $URL"
 
-          STATUS=$(curl -L --retry 5 --retry-delay 5 -s -o /dev/null -w "%{http_code}" $URL)
+          STATUS=$(curl -L -s -o /dev/null -w "%{http_code}" "$URL")
 
-          echo "Health check status: $STATUS"
+           echo "Health check status: $STATUS"
 
           if [ "$STATUS" != "200" ]; then
-            echo "Health check FAILED (status: $STATUS)"
+            echo "Health check FAILED"
             exit 1
           fi
 

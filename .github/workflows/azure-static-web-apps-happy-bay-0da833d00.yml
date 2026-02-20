@@ -41,4 +41,6 @@ jobs:
             action: "upload"
         
             skip_app_build: true
-            app_artifact_location: "frontend/dist/docvault-frontend/browser"
+            app_artifact_location: "frontend/dist/docvault-frontend"
+            config_file_location: "frontend/staticwebapp.config.json"
+

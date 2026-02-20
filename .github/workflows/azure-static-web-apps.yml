@@ -25,7 +25,7 @@ jobs:
           action: "upload"
           app_location: "/frontend"
           api_location: ""
-          output_location: ""   
+          output_location: "dist/docvault-frontend/browser" 
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'

@@ -18,6 +18,7 @@ env:
   ANGULAR_APP_PATH:  './frontend'
 
 jobs:
+
   # ── Job 1: Build .NET API ────────────────────────────────────────────────
   build-api:
     name: Build .NET 8 API
@@ -36,10 +37,17 @@ jobs:
         run: dotnet restore ${{ env.API_PROJECT_PATH }}
 
       - name: Build API (Release)
-        run: dotnet build ${{ env.API_PROJECT_PATH }} --configuration Release --no-restore
+        run: |
+          dotnet build ${{ env.API_PROJECT_PATH }} \
+            --configuration Release \
+            --no-restore
 
       - name: Publish API
-        run: dotnet publish ${{ env.API_PROJECT_PATH }} --configuration Release --no-build --output ./publish/api
+        run: |
+          dotnet publish ${{ env.API_PROJECT_PATH }} \
+            --configuration Release \
+            --no-build \
+            --output ./publish/api
 
       - name: Upload API artifact
         uses: actions/upload-artifact@v4
@@ -47,6 +55,7 @@ jobs:
           name: api-build
           path: ./publish/api
           retention-days: 7
+
 
   # ── Job 2: Build Angular Frontend ────────────────────────────────────────
   build-frontend:
@@ -87,7 +96,8 @@ jobs:
           path: ${{ env.ANGULAR_APP_PATH }}/dist/docvault-frontend/browser
           retention-days: 7
 
-  # ── Job 3: Deploy API to Azure App Service ───────────────────────────────
+
+  # ── Job 3: Deploy API ────────────────────────────────────────────────────
   deploy-api:
     name: Deploy API to Azure
     runs-on: ubuntu-latest
@@ -108,14 +118,17 @@ jobs:
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package:         ./publish/api
 
-      # ✅ FIXED HEALTH CHECK
+      # FIXED HEALTH CHECK
       - name: Health check – wait for API
         run: |
-          echo "Waiting 30s for API to warm up..."
-          sleep 30
+          echo "Waiting 40s for API to warm up..."
+          sleep 40
 
-          STATUS=$(curl -L -s -o /dev/null -w "%{http_code}" \
-            http://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net/api/documents/health)
+          URL="http://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net/api/documents/health"
+
+          echo "Checking API health at: $URL"
+
+          STATUS=$(curl -L --retry 5 --retry-delay 5 -s -o /dev/null -w "%{http_code}" $URL)
 
           echo "Health check status: $STATUS"
 
@@ -125,6 +138,7 @@ jobs:
           fi
 
           echo "API is healthy!"
+
 
   # ── Summary ──────────────────────────────────────────────────────────────
   summary:
@@ -136,10 +150,10 @@ jobs:
     steps:
       - name: Print summary
         run: |
-          echo "## DocVault Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 DocVault Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Build API         | ${{ needs.build-api.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Build Frontend    | ${{ needs.build-frontend.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Deploy API        | ${{ needs.deploy-api.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build API | ${{ needs.build-api.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Frontend | ${{ needs.build-frontend.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy API | ${{ needs.deploy-api.result }} |" >> $GITHUB_STEP_SUMMARY

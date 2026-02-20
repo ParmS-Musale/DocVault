@@ -11,7 +11,7 @@ const TENANT_ID = "1ab85098-b091-44d7-b9c0-f294a9b5ac88";
 const API_CLIENT_ID = "9ddfe1ae-4b5a-4b87-85a7-4b4885b06dde";
 
 const REDIRECT_URI =
-  "https://happy-bay-0da833d00.2.azurestaticapps.net";
+  "https://delightful-glacier-0ac322700.4.azurestaticapps.net";
 
 const API_SCOPE =
   "api://9ddfe1ae-4b5a-4b87-85a7-4b4885b06dde/access_as_user";
@@ -24,8 +24,8 @@ export function msalInstanceFactory() {
     auth: {
       clientId: ANGULAR_CLIENT_ID,
       authority: `https://login.microsoftonline.com/${TENANT_ID}`,
-      redirectUri: REDIRECT_URI,
-      postLogoutRedirectUri: REDIRECT_URI,
+      redirectUri: window.location.origin,
+      postLogoutRedirectUri: window.location.origin,
     },
     cache: {
       cacheLocation: BrowserCacheLocation.LocalStorage,

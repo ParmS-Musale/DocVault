@@ -1,18 +1,36 @@
-import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
-import { provideRouter, withViewTransitions } from '@angular/router';
-import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
-import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import { routes } from './app.routes';
+import { ApplicationConfig, importProvidersFrom } from "@angular/core";
+import { provideRouter } from "@angular/router";
+import { routes } from "./app.routes";
+import { provideHttpClient, withInterceptors, withFetch, withInterceptorsFromDi, HTTP_INTERCEPTORS } from "@angular/common/http";
+import { MsalInterceptor } from "@azure/msal-angular";
+import { provideAnimations } from '@angular/platform-browser/animations';
+import { BrowserModule } from "@angular/platform-browser";
+import { MsalModule } from "@azure/msal-angular";
+import { msalInstanceFactory, msalGuardConfigFactory, msalInterceptorConfigFactory } from "./msal.config";
 
-/**
- * Application-level providers configured using the standalone API.
- * No NgModules – fully signal/functional setup.
- */
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideZoneChangeDetection({ eventCoalescing: true }),
-    provideRouter(routes, withViewTransitions()),
-    provideHttpClient(withInterceptorsFromDi()),
-    provideAnimationsAsync()
+    provideRouter(routes),
+
+    provideHttpClient(
+      withFetch(),
+      withInterceptorsFromDi()
+    ),
+
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: MsalInterceptor,
+      multi: true
+    },
+
+    provideAnimations(),
+
+    importProvidersFrom(
+      MsalModule.forRoot(
+        msalInstanceFactory(),
+        msalGuardConfigFactory(),
+        msalInterceptorConfigFactory()
+      )
+    )
   ]
 };

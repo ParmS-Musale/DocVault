@@ -5,6 +5,9 @@ bin/
 obj/
 out/
 publish/
+deploy/
+publish-linux/
+*.zip
 
 ############################
 # Visual Studio / Rider
@@ -36,10 +39,16 @@ local.settings.json
 # Azure / Azurite
 ############################
 __azurite_db_blob__.json
+__azurite_db_blob_extent__.json
 __azurite_db_queue__.json
+__azurite_db_queue_extent__.json
 __azurite_db_table__.json
+__azurite_db_table_extent__.json
 __blobstorage__/
+__queuestorage__/
+__tablestorage__/
 .azurite/
+AzuriteConfig
 
 ############################
 # Azure Functions
@@ -59,6 +68,7 @@ dist/
 
 frontend/node_modules/
 node_modules/
+coverage/
 
 ############################
 # Node logs

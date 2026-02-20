@@ -1,25 +1,25 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
+import { RouterLink, ActivatedRoute } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
-import { MatSortModule, Sort } from '@angular/material/sort';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { FormsModule } from '@angular/forms';
+import { MatMenuModule } from '@angular/material/menu';
+
 import { DocumentService } from '../../services/document.service';
 import { DocumentDto } from '../../models/document.model';
+import { DocumentCardComponent } from '../document-card/document-card.component';
 
-/**
- * Document listing page.
- * Fetches documents from the API and renders them
- * in a sortable, filterable Material table.
- */
+interface DocumentGroup {
+  category: string;
+  icon: string;
+  files: DocumentDto[];
+}
+
 @Component({
   selector: 'app-document-list',
   standalone: true,
@@ -27,311 +27,250 @@ import { DocumentDto } from '../../models/document.model';
     CommonModule,
     RouterLink,
     FormsModule,
-    MatCardModule,
     MatButtonModule,
     MatIconModule,
-    MatTableModule,
-    MatSortModule,
     MatInputModule,
     MatFormFieldModule,
     MatProgressSpinnerModule,
     MatChipsModule,
-    MatTooltipModule
+    MatMenuModule,
+    DocumentCardComponent
   ],
   template: `
-    <div class="list-container">
-      <!-- Header -->
-      <div class="page-header">
-        <mat-icon class="page-icon">folder_open</mat-icon>
-        <h1>Document Library</h1>
-        <p>{{ documents().length }} document{{ documents().length !== 1 ? 's' : '' }} stored</p>
+    <div class="dashboard-container">
+      
+      <!-- Welcome / Stats Header -->
+      <div class="dashboard-header">
+        <div class="header-text">
+          <h1>My Documents</h1>
+          <p class="subtitle">{{ totalFiles() }} files stored in DocVault</p>
+        </div>
+        <a mat-raised-button color="primary" routerLink="/upload" class="upload-btn">
+          <mat-icon>cloud_upload</mat-icon>
+          Upload New
+        </a>
       </div>
 
-      <!-- Toolbar -->
-      <mat-card class="toolbar-card">
-        <div class="toolbar">
-          <!-- Search -->
-          <mat-form-field appearance="outline" class="search-field">
-            <mat-label>Search documents</mat-label>
-            <input matInput [(ngModel)]="searchTerm" (input)="applyFilter()" placeholder="e.g. report.pdf">
-            <mat-icon matPrefix>search</mat-icon>
-            @if (searchTerm) {
-              <button matSuffix mat-icon-button (click)="searchTerm = ''; applyFilter()">
-                <mat-icon>close</mat-icon>
-              </button>
-            }
-          </mat-form-field>
-
-          <!-- Refresh Button -->
-          <button mat-stroked-button color="primary" (click)="loadDocuments()" [disabled]="loading()">
-            <mat-icon>refresh</mat-icon>
-            Refresh
-          </button>
-
-          <!-- Upload Button -->
-          <a mat-raised-button color="primary" routerLink="/upload">
-            <mat-icon>cloud_upload</mat-icon>
-            Upload
-          </a>
+      <!-- Search & Filters -->
+      <div class="toolbar">
+        <div class="search-wrapper">
+          <mat-icon class="search-icon">search</mat-icon>
+          <input 
+            type="text" 
+            placeholder="Search by name..." 
+            [(ngModel)]="searchTerm" 
+            (input)="applyFilter()"
+            class="search-input"
+          >
+          @if (searchTerm) {
+            <button mat-icon-button (click)="clearSearch()" class="clear-btn">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
         </div>
-      </mat-card>
+
+        <button mat-stroked-button (click)="loadDocuments()" [disabled]="loading()">
+          <mat-icon>refresh</mat-icon>
+          Refresh
+        </button>
+      </div>
 
       <!-- Loading State -->
       @if (loading()) {
-        <div class="loading-state">
-          <mat-spinner diameter="48" />
-          <p>Loading documents...</p>
+        <div class="state-container">
+          <mat-spinner diameter="40"></mat-spinner>
+          <p>Syncing your documents...</p>
         </div>
       }
 
       <!-- Error State -->
       @if (error() && !loading()) {
-        <mat-card class="error-card">
-          <mat-icon class="error-icon-lg">error_outline</mat-icon>
-          <h3>Failed to load documents</h3>
+        <div class="state-container error">
+          <mat-icon class="error-icon">error_outline</mat-icon>
+          <h3>Unable to load documents</h3>
           <p>{{ error() }}</p>
-          <button mat-raised-button color="primary" (click)="loadDocuments()">
-            Try Again
-          </button>
-        </mat-card>
+          <button mat-flat-button color="primary" (click)="loadDocuments()">Retry</button>
+        </div>
       }
 
-      <!-- Empty State -->
-      @if (!loading() && !error() && filteredDocuments().length === 0) {
-        <div class="empty-state">
+      <!-- Empty Results State -->
+      @if (!loading() && !error() && groups().length === 0) {
+        <div class="state-container empty">
+          <img src="https://cdn-icons-png.flaticon.com/512/7486/7486776.png" alt="No files" width="120" style="opacity: 0.5; margin-bottom: 1rem;">
           @if (searchTerm) {
-            <mat-icon>search_off</mat-icon>
             <h3>No results found</h3>
-            <p>No documents match "<strong>{{ searchTerm }}</strong>". Try a different search.</p>
+            <p>We couldn't find any files matching "{{ searchTerm }}".</p>
+            <button mat-stroked-button (click)="clearSearch()">Clear Search</button>
           } @else {
-            <mat-icon>cloud_queue</mat-icon>
-            <h3>No documents yet</h3>
-            <p>Upload your first document to get started.</p>
-            <a mat-raised-button color="primary" routerLink="/upload">
-              <mat-icon>cloud_upload</mat-icon>
-              Upload Document
-            </a>
+            <h3>Ready to store your files</h3>
+            <p>Upload documents, images, and sheets to get started.</p>
+            <a mat-flat-button color="primary" routerLink="/upload">Upload Now</a>
           }
         </div>
       }
 
-      <!-- Document Table -->
-      @if (!loading() && !error() && filteredDocuments().length > 0) {
-        <mat-card class="table-card">
-          <div class="table-wrapper">
-            <table mat-table [dataSource]="filteredDocuments()" matSort (matSortChange)="sortData($event)" class="doc-table">
+      <!-- Document Groups -->
+      @if (!loading() && !error()) {
+        <div class="groups-container">
+          @for (group of groups(); track group.category) {
+            <section class="doc-group">
+              <div class="group-header" (click)="toggleGroup(group.category)">
+                <div class="header-left">
+                  <mat-icon class="group-icon">{{ group.icon }}</mat-icon>
+                  <h2>{{ group.category }}</h2>
+                  <span class="count-badge">{{ group.files.length }}</span>
+                </div>
+                <!-- <mat-icon class="expand-icon">expand_more</mat-icon> -->
+              </div>
 
-              <!-- File Name Column -->
-              <ng-container matColumnDef="fileName">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header>File Name</th>
-                <td mat-cell *matCellDef="let doc">
-                  <div class="file-name-cell">
-                    <mat-icon class="row-icon" [class]="'type-' + getFileType(doc)">
-                      {{ getFileIcon(doc) }}
-                    </mat-icon>
-                    <span class="file-name-text" [matTooltip]="doc.fileName">{{ doc.fileName }}</span>
-                  </div>
-                </td>
-              </ng-container>
-
-              <!-- File Size Column -->
-              <ng-container matColumnDef="fileSize">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header>Size</th>
-                <td mat-cell *matCellDef="let doc">
-                  <mat-chip class="size-chip">{{ formatSize(doc.fileSize) }}</mat-chip>
-                </td>
-              </ng-container>
-
-              <!-- Content Type Column -->
-              <ng-container matColumnDef="contentType">
-                <th mat-header-cell *matHeaderCellDef>Type</th>
-                <td mat-cell *matCellDef="let doc">
-                  <span class="content-type">{{ getShortType(doc.contentType) }}</span>
-                </td>
-              </ng-container>
-
-              <!-- Upload Date Column -->
-              <ng-container matColumnDef="uploadDate">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header>Upload Date</th>
-                <td mat-cell *matCellDef="let doc">
-                  <div class="date-cell">
-                    <span class="date-primary">{{ doc.uploadDate | date:'MMM d, y' }}</span>
-                    <span class="date-secondary">{{ doc.uploadDate | date:'h:mm a' }}</span>
-                  </div>
-                </td>
-              </ng-container>
-
-              <!-- Actions Column -->
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef>Actions</th>
-                <td mat-cell *matCellDef="let doc">
-                  <div class="actions-cell">
-                    <a
-                      mat-icon-button
-                      color="primary"
-                      [href]="doc.downloadUrl"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      matTooltip="Download file"
-                    >
-                      <mat-icon>download</mat-icon>
-                    </a>
-                    <button
-                      mat-icon-button
-                      (click)="copyLink(doc.downloadUrl)"
-                      matTooltip="Copy download link"
-                    >
-                      <mat-icon>content_copy</mat-icon>
-                    </button>
-                  </div>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="doc-row"></tr>
-            </table>
-          </div>
-
-          <!-- Table Footer -->
-          <div class="table-footer">
-            <span class="result-count">
-              Showing {{ filteredDocuments().length }} of {{ documents().length }} documents
-            </span>
-          </div>
-        </mat-card>
+              <div class="doc-grid">
+                @for (doc of group.files; track doc.id) {
+                  <app-document-card 
+                    [document]="doc" 
+                    (onDelete)="deleteDocument(doc)"
+                    (onPreview)="previewDocument(doc)"
+                  />
+                }
+              </div>
+            </section>
+          }
+        </div>
       }
     </div>
   `,
   styles: [`
-    .list-container {
+    .dashboard-container {
       max-width: 1100px;
       margin: 0 auto;
-      padding: 32px 24px 64px;
+      padding-bottom: 4rem;
     }
 
-    .page-header {
-      text-align: center;
-      margin-bottom: 32px;
-    }
-    .page-icon {
-      font-size: 48px;
-      width: 48px;
-      height: 48px;
-      color: var(--primary);
-      margin-bottom: 12px;
-    }
-    .page-header h1 { margin: 0 0 8px; font-size: 2rem; font-weight: 700; }
-    .page-header p  { color: var(--text-secondary); margin: 0; }
-
-    /* ── Toolbar ─────────────────────────────────────────── */
-    .toolbar-card { border-radius: 16px !important; margin-bottom: 20px; }
-    .toolbar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 16px;
-      flex-wrap: wrap;
-    }
-    .search-field { flex: 1; min-width: 240px; }
-    .toolbar button, .toolbar a { white-space: nowrap; }
-
-    /* ── States ──────────────────────────────────────────── */
-    .loading-state {
+    .dashboard-header {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 16px;
-      padding: 64px;
-      color: var(--text-secondary);
-    }
-
-    .error-card {
+      justify-content: center;
+      margin-bottom: 3rem;
       text-align: center;
-      padding: 48px;
-      border-radius: 16px !important;
     }
-    .error-icon-lg {
-      font-size: 64px;
-      width: 64px;
-      height: 64px;
-      color: #e53935;
-      margin-bottom: 16px;
+    
+    .dashboard-header .header-text {
+      margin-bottom: 1.5rem;
     }
 
-    .empty-state {
-      text-align: center;
-      padding: 80px 24px;
-      color: var(--text-secondary);
+    h1 { font-size: 2.5rem; margin-bottom: 0.5rem; font-weight: 700; }
+    .subtitle { color: var(--text-secondary); font-size: 1.1rem; }
+
+    .upload-btn {
+      padding: 0 2rem !important;
+      height: 48px;
     }
-    .empty-state mat-icon {
-      font-size: 80px;
-      width: 80px;
-      height: 80px;
-      margin-bottom: 16px;
-      opacity: 0.3;
+
+    /* Toolbar & Search */
+    .toolbar {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 3rem;
     }
-    .empty-state h3 { font-size: 1.4rem; margin: 0 0 8px; color: var(--text-primary); }
-    .empty-state p  { margin: 0 0 24px; }
 
-    /* ── Table ───────────────────────────────────────────── */
-    .table-card { border-radius: 16px !important; overflow: hidden; }
-    .table-wrapper { overflow-x: auto; }
-    .doc-table { width: 100%; }
-
-    .doc-row { transition: background 0.15s; }
-    .doc-row:hover { background: rgba(63,81,181,0.04); }
-
-    .file-name-cell {
+    .search-wrapper {
+      width: 480px;
+      position: relative;
       display: flex;
       align-items: center;
-      gap: 10px;
-      min-width: 160px;
     }
-    .row-icon { font-size: 22px; width: 22px; height: 22px; }
-    .file-name-text {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 260px;
+
+    .search-icon {
+      position: absolute;
+      left: 1rem;
+      color: var(--text-secondary);
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 48px;
+      padding: 0 1rem 0 3rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      font-size: 1rem;
+      background: var(--bg-surface);
+      transition: all 0.2s;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+
+    .clear-btn {
+      position: absolute;
+      right: 0.5rem;
+      color: var(--text-secondary);
+    }
+
+    /* States */
+    .state-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4rem 0;
+      text-align: center;
+      color: var(--text-secondary);
+    }
+    .state-container.error { color: var(--danger); }
+    .error-icon { font-size: 48px; width: 48px; height: 48px; margin-bottom: 1rem; }
+
+    /* Groups */
+    .groups-container {
+      display: flex;
+      flex-direction: column;
+      gap: 2.5rem;
+    }
+
+    .doc-group {
+      animation: fadeIn 0.4s ease;
+    }
+
+    .group-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .group-icon { color: var(--primary); }
+    .group-header h2 { font-size: 1.25rem; font-weight: 600; margin: 0; }
+    
+    .count-badge {
+      background: var(--bg-input);
+      color: var(--text-secondary);
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
       font-weight: 500;
     }
-    .type-pdf   { color: #e53935; }
-    .type-image { color: #fb8c00; }
-    .type-doc   { color: #1565c0; }
-    .type-sheet { color: #2e7d32; }
-    .type-text  { color: #546e7a; }
 
-    .size-chip {
-      font-size: 0.75rem !important;
-      height: 22px !important;
-      background: rgba(63,81,181,0.1) !important;
-      color: var(--primary) !important;
+    .doc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.5rem;
     }
 
-    .content-type {
-      font-size: 0.8rem;
-      color: var(--text-secondary);
-      background: #f5f5f5;
-      padding: 2px 8px;
-      border-radius: 4px;
-    }
-
-    .date-cell { display: flex; flex-direction: column; }
-    .date-primary   { font-weight: 500; font-size: 0.9rem; }
-    .date-secondary { font-size: 0.75rem; color: var(--text-secondary); }
-
-    .actions-cell { display: flex; gap: 4px; }
-
-    .table-footer {
-      padding: 12px 16px;
-      border-top: 1px solid rgba(0,0,0,0.08);
-      color: var(--text-secondary);
-      font-size: 0.875rem;
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
   `]
 })
 export class DocumentListComponent implements OnInit {
   private readonly docService = inject(DocumentService);
+  private readonly route = inject(ActivatedRoute);
 
   documents         = signal<DocumentDto[]>([]);
   filteredDocuments = signal<DocumentDto[]>([]);
@@ -339,9 +278,63 @@ export class DocumentListComponent implements OnInit {
   error             = signal<string | null>(null);
   searchTerm        = '';
 
-  displayedColumns = ['fileName', 'fileSize', 'contentType', 'uploadDate', 'actions'];
+  // Smart Grouping Logic
+  groups = computed(() => {
+    const docs = this.filteredDocuments();
+    const groupsMap = new Map<string, DocumentDto[]>();
+
+    // Initial groups order
+    groupsMap.set('PDFs', []);
+    groupsMap.set('Images', []);
+    groupsMap.set('Spreadsheets', []);
+    groupsMap.set('Documents', []);
+    groupsMap.set('Others', []);
+
+    docs.forEach(doc => {
+      const type = doc.contentType;
+      if (type === 'application/pdf') {
+        groupsMap.get('PDFs')?.push(doc);
+      } else if (type.startsWith('image/')) {
+        groupsMap.get('Images')?.push(doc);
+      } else if (type.includes('spreadsheet') || type.includes('excel') || type.includes('csv')) {
+        groupsMap.get('Spreadsheets')?.push(doc);
+      } else if (type.includes('word') || type.includes('document') || type.includes('text/plain')) {
+        groupsMap.get('Documents')?.push(doc);
+      } else {
+        groupsMap.get('Others')?.push(doc);
+      }
+    });
+
+    const result: DocumentGroup[] = [];
+    const icons: Record<string, string> = {
+      'PDFs': 'picture_as_pdf',
+      'Images': 'image',
+      'Spreadsheets': 'table_chart',
+      'Documents': 'description',
+      'Others': 'folder'
+    };
+
+    for (const [category, files] of groupsMap.entries()) {
+      if (files.length > 0) {
+        result.push({
+          category,
+          icon: icons[category],
+          files
+        });
+      }
+    }
+
+    return result;
+  });
+
+  totalFiles = computed(() => this.documents().length);
 
   ngOnInit(): void {
+    this.route.queryParams.subscribe(params => {
+      if (params['type']) {
+        // filter by type logic if needed in future
+      }
+    });
     this.loadDocuments();
   }
 
@@ -354,92 +347,55 @@ export class DocumentListComponent implements OnInit {
         this.documents.set(docs);
         this.filteredDocuments.set(docs);
         this.loading.set(false);
+        this.applyFilter(); // re-apply search if exists
       },
       error: err => {
-        this.error.set(err?.error?.error ?? 'Unable to connect to the API.');
+        console.error(err);
+        this.error.set('Could not load your documents. Please try again.');
         this.loading.set(false);
       }
     });
   }
 
   applyFilter(): void {
-    const term = this.searchTerm.trim().toLowerCase();
+    const term = this.searchTerm.toLowerCase().trim();
     if (!term) {
       this.filteredDocuments.set(this.documents());
-    } else {
-      this.filteredDocuments.set(
-        this.documents().filter(d =>
-          d.fileName.toLowerCase().includes(term) ||
-          d.contentType.toLowerCase().includes(term)
-        )
-      );
-    }
-  }
-
-  sortData(sort: Sort): void {
-    const data = [...this.filteredDocuments()];
-    if (!sort.active || sort.direction === '') {
-      this.filteredDocuments.set(data);
       return;
     }
 
-    this.filteredDocuments.set(data.sort((a, b) => {
-      const asc = sort.direction === 'asc';
-      switch (sort.active) {
-        case 'fileName':   return compare(a.fileName, b.fileName, asc);
-        case 'fileSize':   return compare(a.fileSize, b.fileSize, asc);
-        case 'uploadDate': return compare(a.uploadDate, b.uploadDate, asc);
-        default: return 0;
-      }
-    }));
+    const filtered = this.documents().filter(doc => 
+      doc.fileName.toLowerCase().includes(term)
+    );
+    this.filteredDocuments.set(filtered);
   }
 
-  async copyLink(url: string): Promise<void> {
-    await navigator.clipboard.writeText(url);
+  clearSearch() {
+    this.searchTerm = '';
+    this.applyFilter();
   }
 
-  formatSize(bytes: number): string {
-    if (bytes < 1024)        return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+  toggleGroup(category: string) {
+    // Toggle logic can be added here (collapsed state)
   }
 
-  getFileType(doc: DocumentDto): string {
-    if (doc.contentType.startsWith('image/'))              return 'image';
-    if (doc.contentType === 'application/pdf')             return 'pdf';
-    if (doc.contentType.includes('spreadsheet') || doc.contentType.includes('excel')) return 'sheet';
-    if (doc.contentType.includes('word') || doc.contentType.includes('document'))     return 'doc';
-    return 'text';
+  deleteDocument(doc: DocumentDto) {
+    if(confirm(`Are you sure you want to delete ${doc.fileName}?`)) {
+      this.docService.deleteDocument(doc.id).subscribe({
+        next: () => {
+          this.documents.update(docs => docs.filter(d => d.id !== doc.id));
+          this.applyFilter();
+        },
+        error: (err) => {
+          console.error('Error deleting document', err);
+          // Optional: Show a toast/snackbar here
+          alert('Failed to delete document');
+        }
+      });
+    }
   }
 
-  getFileIcon(doc: DocumentDto): string {
-    const icons: Record<string, string> = {
-      image: 'image',
-      pdf:   'picture_as_pdf',
-      sheet: 'table_chart',
-      doc:   'description',
-      text:  'article'
-    };
-    return icons[this.getFileType(doc)] ?? 'insert_drive_file';
+  previewDocument(doc: DocumentDto) {
+    window.open(doc.downloadUrl, '_blank');
   }
-
-  getShortType(contentType: string): string {
-    const map: Record<string, string> = {
-      'application/pdf': 'PDF',
-      'image/jpeg': 'JPEG',
-      'image/png':  'PNG',
-      'image/gif':  'GIF',
-      'text/plain': 'TXT',
-      'text/csv':   'CSV',
-      'application/msword': 'DOC',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
-      'application/vnd.ms-excel': 'XLS',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX'
-    };
-    return map[contentType] ?? contentType.split('/')[1]?.toUpperCase() ?? '?';
-  }
-}
-
-function compare(a: string | number, b: string | number, asc: boolean): number {
-  return (a < b ? -1 : a > b ? 1 : 0) * (asc ? 1 : -1);
 }
